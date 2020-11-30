@@ -16,6 +16,7 @@ import numpy as np
 import re
 import h5py as h5
 import statistics as st
+import matplotlib.pyplot as plt
 
 print ("\nModules loaded\n")
 
@@ -85,91 +86,89 @@ def time_series(data, lat, lon, ix=False):
     plt.show()
     
     return
-
-def coh(arr):
-    """Find values in arrays that are not nan and then create an array of indices 
-    corresponding to these coherent pixels. """
-    n, m = arr.shape
-    mask = ~np.isnan(np.asarray(arr))
-    ix = np.arange(n*m).reshape(n, m)
-    cix = ix[mask]
-    
-    return mask, cix
-
-def STIP(N, ifgs):
-    """Implimentation of STIP
-    N = no. of SLCs
-    N-1 = no. of IFGs"""
-    STIPix = []
-    d, r, c = ifgs.shape # For dates, rows, columns
-#    ix = np.arange(r*c).reshape(r, c)
-    tall = []
-    for n in np.arange(-(N-2),N-1,1):
-        
-        for m in np.arange(N):
-            ppad = np.pad(ifgs, 10)
-            tsum = np.zeros((r, c-1))
-            pc = np.delete(ifgs[m], -1, axis=1)
-            pn = np.delete(ifgs[m+n], 0, axis=1)
-            
-            t = np.exp(pc)*np.exp(-pn)
-            tsum += t
-            
-        tall.append(tsum)
-    
-    argmaxix = np.argmax(tall, axis=0)
-    STIP_mask = (argmaxix == st.median(range(len(tall))))
-
-    return tall, STIP_mask
     
 def STIP(N, ifgs):
     """Implimentation of STIP
     N = no. of SLCs
     N-1 = no. of IFGs"""
-    STIPix = []
-    d, r, c = ifgs.shape # For dates, rows, columns
-#    ix = np.arange(r*c).reshape(r, c)
-    tall = []
-    for n in np.arange(-(N-2),N-1,1):
+    dates = np.asarray(ext_data('Date', f))
+    ifgs = ifgs[:N-1]
+    datesn, r, c = ifgs.shape # For dates, rows, columns
+    STIP_count = np.zeros((r, c))
+    dlist = neighbourhood(5)
+    print (dlist)
+    
+    for h in dlist:
         
-        for m in np.arange(N):
+        for v in dlist:
+            argarray = []
             
-            ppad = np.pad(ifgs, 10)
-            tsum = np.zeros((r, c-1))
-            pc = np.delete(ifgs[m], -1, axis=1)
-            pn = np.delete(ifgs[m+n], 0, axis=1)
+            print (f'Starting with h={h}, v={v}')
+            # Looping through the padding to create the neighbour matrices
             
-            t = np.exp(pc)*np.exp(-pn)
-            tsum += t
-            
-        tall.append(tsum)
-    
-    argmaxix = np.argmax(tall, axis=0)
-    STIP_mask = (argmaxix == st.median(range(len(tall))))
+            for n in np.arange(-(N-2),N-1,1):
+            # Looping through the argmax
+                for m in np.arange(len(ifgs)):
+                # Looping through the dates 
+                    esum = np.zeros((r, c))
+                    if 1 <= m+n <= N-2:
+                        
+                        #print ("Calc ", m, n)
+                        
+                        # Center pixel
+                        pc = ifgs[m]
+                        # print (pc.shape)
+                        # Neighbour pixel (same matrix but shifted some way based on h & v.
+                        pn = padding(ifgs[m+n], h, v)
+                        
+                        # Exponential (didn't include complex i since the phase values are 
+                        # real in this data set)...
+                        e = np.exp(pc)*np.exp(-pn)
+                        
+                        # Exponential sum
+                        esum += e
+                    else:
+                        #print ("Skip ", m, n)
+                        pass
+                
+                # Add to array to perform argmax on
+                argarray.append(esum)
+            # print (argarray.shape)
+            # Looks at all the sums for a specific pixel across all the time lags and finds
+            # the index of the max value
+            print (np.asarray(argarray).shape)
+            argmaxix = np.argmax(argarray, axis=0)
+        
+            # If the index of the argmax for a specific value is in the middle of the stack
+            # (meaning zero time lag) then it is a STIP. This adds 1 to that pixel if it is
+            # otherwise adds zero.
+            # STIP_count is therefore a 2d array (with same dimensions as ifgs) where the 
+            # number corresponds to the number of STIP pixels.
+            STIP_count += (argmaxix == st.median(range(len(argarray))))*1
+        
+        # The loop is restarted for the next h and v values.
 
-    return tall, STIP_mask
+    return STIP_count
     
-def padding(arr, hv=(0,0)):
+def padding(arr, h, v):
     """If h -ve then add columns to the left. +ve add columns to the right
     IF v -ve then add rows to the top. +ve add rows to the right."""
     
-    h, v = hv
-    
     r,c = arr.shape
     
-    arr_new=arr
+    arr_new=arr.copy()
     
     if h < 0:
         # Adding columns to left
         to_add = np.zeros((r, np.abs(h)))
-        arr_new = np.concatenate((to_add, arr[:,:h]), axis=1)
+        arr_new = np.concatenate((to_add, arr_new[:,:h]), axis=1)
         
     elif h > 0: 
         # Adding columns to right
         to_add = np.zeros((r, h))
-        arr_new = np.concatenate((arr[:,h:], to_add[:,h:]), axis=1)
+        arr_new = np.concatenate((arr_new[:,h:], to_add), axis=1)
     else:
-        arr_new = arr
+        pass
         
     if v < 0:
         # Adding rows to the top
@@ -180,32 +179,19 @@ def padding(arr, hv=(0,0)):
         to_add = np.zeros((v, c))
         arr_new = np.concatenate((arr_new[v:,:], to_add), axis=0)
     else:
-        arr_new = arr
+        pass
         
     return arr_new
 
-def neighbourhood(n, matrix):
-    """setting up the neighbourhoods"""
-    pad_matrix = np.pad(matrix, n)
-    r,c = matrix.shape
+def neighbourhood(windowDim):
+    """setting up the neighbourhoods (number of rows/cols for padding)"""
     
+    d = round(int(windowDim)/2)
     
-    return
-#    for n in np.arange(-(N-2),N-1,1):
-#        for i in np.arange(r*c):
-#            x, y = np.where(ix == i)
-#            t_all = []
-#            
-#            for m in np.arange(N):
-#                try:
-#                    pc = ifgs[m,x,y] # center pixel
-#                    pn = ifgs[m+n,x+1,y] # neighbour pixel
-#                except IndexError:
-#                    pass
-#                t = np.exp(pc)*np.exp(-pn)# For test
-#                
-#            tsum = sum(t_all)
-#            print (tsum)
+    dlist = np.arange(-d, d+1, 1)
+    dlist = dlist[np.abs(dlist)>0]
+    
+    return dlist
 
 def cityblock(n):
     center = np.pad(np.arange(n+1), (n,0), 'reflect')
@@ -220,8 +206,33 @@ def cityblock(n):
     truth_coords = np.where(truth==1)
     
     return cb, truth, truth_coords
+    
+def contour(arr):
+    fig, ax = plt.subplots()
+    contf = ax.contourf(arr)
+    cbar = fig.colorbar(contf)
+    plt.savefig('STIP_cont.png')
+    plt.show()
+    
+def scatter(lon, lat, col):
+    fig, ax = plt.subplots()
+    sca = ax.scatter(lon, lat, c=col, s=1)
+    cbar = fig.colorbar(sca)
+    plt.savefig('STIP_scatter.png')
+    plt.show()
 
 main()
 
 f = open_hdf(fn2)
+
 phase = np.asarray(ext_data('Phase', f))
+lon = np.asarray(ext_data('Longitude', f))
+lat = np.asarray(ext_data('Latitude', f))
+
+count = STIP(10, phase)
+
+np.savetxt('STIP_count_21by21_18dates.csv', count, delimiter=',')
+
+scatter(lon, lat, count)
+
+
