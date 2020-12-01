@@ -25,6 +25,9 @@ print ("\nModules loaded\n")
 fn = r'/home/jacob/InSAR_workspace/data/doncaster/vel_jacob_doncaster.h5'
 fn2 = r'/home/jacob/InSAR_workspace/data/doncaster/data_jacob_doncaster.h5'
 
+N = 18
+w = 15
+
 #=====================CODE=========================
 class Usage(Exception):
     def __init__(self, msg):
@@ -87,17 +90,17 @@ def time_series(data, lat, lon, ix=False):
     
     return
     
-def STIP(N, ifgs):
+def STIP(N, window, ifgs):
     """Implimentation of STIP
     N = no. of SLCs
     N-1 = no. of IFGs"""
     dates = np.asarray(ext_data('Date', f))
-    ifgs = ifgs[:N-1]
+    ifgs = ifgs[-(N-1):]
     datesn, r, c = ifgs.shape # For dates, rows, columns
     STIP_count = np.zeros((r, c))
-    dlist = neighbourhood(5)
+    dlist = neighbourhood(window)
     print (dlist)
-    
+    cmpx = 1j
     for h in dlist:
         
         for v in dlist:
@@ -110,7 +113,7 @@ def STIP(N, ifgs):
             # Looping through the argmax
                 for m in np.arange(len(ifgs)):
                 # Looping through the dates 
-                    esum = np.zeros((r, c))
+                    esum = np.zeros((r, c))*1j
                     if 1 <= m+n <= N-2:
                         
                         #print ("Calc ", m, n)
@@ -123,7 +126,7 @@ def STIP(N, ifgs):
                         
                         # Exponential (didn't include complex i since the phase values are 
                         # real in this data set)...
-                        e = np.exp(pc)*np.exp(-pn)
+                        e = np.exp(cmpx*pc)*np.exp(-cmpx*pn)
                         
                         # Exponential sum
                         esum += e
@@ -221,7 +224,7 @@ def scatter(lon, lat, col):
     plt.savefig('STIP_scatter.png')
     plt.show()
 
-main()
+# main()
 
 f = open_hdf(fn2)
 
@@ -229,10 +232,10 @@ phase = np.asarray(ext_data('Phase', f))
 lon = np.asarray(ext_data('Longitude', f))
 lat = np.asarray(ext_data('Latitude', f))
 
-count = STIP(10, phase)
+count = STIP(N, w, phase)
 
-np.savetxt('STIP_count_21by21_18dates.csv', count, delimiter=',')
+np.savetxt(f'STIP_{int(w)}by{int(w)}_{int(N)}dates_comp.csv', count, delimiter=',')
 
-scatter(lon, lat, count)
+# scatter(lon, lat, count)
 
 
