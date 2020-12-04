@@ -1,2 +1,2 @@
-# stip_insar
+# STIP
 Reproducing STIP
