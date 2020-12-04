@@ -11,7 +11,7 @@ import os
 import shutil
 import subprocess as subp
 # import sqlite3
-import datetime as dt
+from datetime import datetime as dt
 import numpy as np
 import re
 import h5py as h5
@@ -82,14 +82,6 @@ def normalise(arr):
         arrc[i] = arrc[i]/maxn
     return arrc, maxn
 
-def time_series(data, lat, lon, ix=False):
-    """To plot a time series from the data"""
-    
-    fig, ax = plt.subplots()        
-    plt.show()
-    
-    return
-    
 def STIP(N, window, ifgs):
     """Implimentation of STIP
     N = no. of SLCs
@@ -116,27 +108,18 @@ def STIP(N, window, ifgs):
                     esum = np.zeros((r, c))*1j
                     if 1 <= m+n <= N-2:
                         
-                        #print ("Calc ", m, n)
-                        
                         # Center pixel
                         pc = ifgs[m]
-                        # print (pc.shape)
                         # Neighbour pixel (same matrix but shifted some way based on h & v.
                         pn = padding(ifgs[m+n], h, v)
-                        
-                        # Exponential (didn't include complex i since the phase values are 
-                        # real in this data set)...
-                        e = np.exp(cmpx*pc)*np.exp(-cmpx*pn)
-                        
+                        e = coherence(pc, pn)
                         # Exponential sum
                         esum += e
                     else:
-                        #print ("Skip ", m, n)
                         pass
                 
                 # Add to array to perform argmax on
                 argarray.append(esum)
-            # print (argarray.shape)
             # Looks at all the sums for a specific pixel across all the time lags and finds
             # the index of the max value
             print (np.asarray(argarray).shape)
@@ -152,7 +135,11 @@ def STIP(N, window, ifgs):
         # The loop is restarted for the next h and v values.
 
     return STIP_count
-    
+
+
+def coherence(arr1, arr2):
+    return np.exp(1j*arr1)*np.exp(-1j*arr2)
+
 def padding(arr, h, v):
     """If h -ve then add columns to the left. +ve add columns to the right
     IF v -ve then add rows to the top. +ve add rows to the right."""
@@ -210,6 +197,52 @@ def cityblock(n):
     
     return cb, truth, truth_coords
     
+def time_series(data, dateix, dates, mask):
+    fig, ax = plt.subplots()
+    print ('Created subplot \n')
+
+    datebool = type(dateix) is tuple
+    if datebool:
+        a, b = dateix
+        data = data[a:b]
+        dates = dates[a:b]
+    else:
+        data = data[-dateix:]
+        dates = dates[-dateix:]
+
+    
+    datesf = np.asarray([dt.strptime(str(d[0]), '%Y%m%d') for d in dates]) 
+    print ('Formatted dates \n')
+    x, y = mask.shape
+    mask = mask.flatten()
+    print (f'Data shape: {data.shape}')
+    datat = data.T.reshape((x*y, len(data)))[mask]
+    print ('Reshaped data \n')
+    # Plotting
+    print (f'Plotting {len(datat)}')
+    for series in datat:
+
+        ax.plot(datesf, series, '-')
+
+    plt.show()
+            
+    return
+
+def hist(array, nbins):
+    try:
+        a, b = array.shape
+        arrayf = array.flatten()
+    except:
+        print ('Array was already 1D - proceeding')
+        arrayf = array.copy()
+    fig, ax = plt.subplots()
+
+    ax.hist(arrayf, nbins)
+    plt.show()
+
+def read_csv(fname):
+    return np.genfromtxt(fname, delimiter=',')
+
 def contour(arr):
     fig, ax = plt.subplots()
     contf = ax.contourf(arr)
@@ -232,9 +265,9 @@ phase = np.asarray(ext_data('Phase', f))
 lon = np.asarray(ext_data('Longitude', f))
 lat = np.asarray(ext_data('Latitude', f))
 
-count = STIP(N, w, phase)
+#count = STIP(N, w, phase)
 
-np.savetxt(f'STIP_{int(w)}by{int(w)}_{int(N)}dates_comp.csv', count, delimiter=',')
+#np.savetxt(f'STIP_{int(w)}by{int(w)}_{int(N)}dates_comp.csv', count, delimiter=',')
 
 # scatter(lon, lat, count)
 
