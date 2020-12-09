@@ -25,8 +25,11 @@ print ("\nModules loaded\n")
 fn = r'/home/jacob/InSAR_workspace/data/doncaster/vel_jacob_doncaster.h5'
 fn2 = r'/home/jacob/InSAR_workspace/data/doncaster/data_jacob_doncaster.h5'
 
-N = 5
-w = 7
+#fn = r'/nfs/a1/insar/sentinel1/UK/jacob_doncaster/vel_jacob_doncaster.h5'
+#fn2 = r'/nfs/a1/insar/sentinel1/UK/jacob_doncaster/data_jacob_doncaster.h5'
+
+N = 18
+w = 11
 
 #=====================CODE=========================
 class Usage(Exception):
@@ -105,11 +108,14 @@ def STIP(N, window, ifgs):
         print (f'Starting with h={h}, v={v}')
         # Looping through the padding to create the neighbour matrices
         lag = np.arange(-(N-2), N-1, 1) 
+        zlagix = int(np.where(lag==0)[0])
+        
         for n in lag:
         # Looping through the argmax
+            esum = np.zeros((r, c))*1j
             for m in np.arange(len(ifgs)):
             # Looping through the dates 
-                esum = np.zeros((r, c))*1j
+                
                 if 1 <= m+n <= N-2:
                     
                     # Center pixel
@@ -134,7 +140,7 @@ def STIP(N, window, ifgs):
         # otherwise adds zero.
         # STIP_count is therefore a 2d array (with same dimensions as ifgs) where the 
         # number corresponds to the number of STIP pixels.
-        STIP_mask = (argmaxix == st.median(range(len(argarray))))
+        STIP_mask = (argmaxix == zlagix) #st.median(range(len(argarray))))
 
         STIP_count += STIP_mask*1
 
@@ -155,8 +161,8 @@ def radCoor(arr):
 
     x = np.asarray(([i for i in range(c)]*r)).reshape((r, c))
     y = np.asarray(([[i]*c for i in range(r)]))
-
-    plt.scatter(x, y, c=arr, s=0.5)
+    if not mask:
+        plt.scatter(x, y, c=arr, s=0.5)
     plt.show()
     return ""
 
