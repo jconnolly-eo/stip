@@ -25,8 +25,8 @@ print ("\nModules loaded\n")
 fn = r'/home/jacob/InSAR_workspace/data/doncaster/vel_jacob_doncaster.h5'
 fn2 = r'/home/jacob/InSAR_workspace/data/doncaster/data_jacob_doncaster.h5'
 
-N = 18
-w = 15
+N = 5
+w = 7
 
 #=====================CODE=========================
 class Usage(Exception):
@@ -89,60 +89,83 @@ def STIP(N, window, ifgs):
     dates = np.asarray(ext_data('Date', f))
     ifgs = ifgs[-(N-1):]
     datesn, r, c = ifgs.shape # For dates, rows, columns
+    print (r, c)
     STIP_count = np.zeros((r, c))
     dlist = neighbourhood(window)
     print (dlist)
+#    index = []
+#    for i in range(r):
+#        for j in range(c):
+#            index.append((i, j))
+#    indexDict = {i: None for i in index}
     cmpx = 1j
-    for h in dlist:
-        
-        for v in dlist:
-            argarray = []
-            
-            print (f'Starting with h={h}, v={v}')
-            # Looping through the padding to create the neighbour matrices
-            
-            for n in np.arange(-(N-2),N-1,1):
-            # Looping through the argmax
-                for m in np.arange(len(ifgs)):
-                # Looping through the dates 
-                    esum = np.zeros((r, c))*1j
-                    if 1 <= m+n <= N-2:
-                        
-                        # Center pixel
-                        pc = ifgs[m]
-                        # Neighbour pixel (same matrix but shifted some way based on h & v.
-                        pn = padding(ifgs[m+n], h, v)
-                        e = coherence(pc, pn)
-                        # Exponential sum
-                        esum += e
-                    else:
-                        pass
+    for h, v in dlist:
+        argarray = []
+         
+        print (f'Starting with h={h}, v={v}')
+        # Looping through the padding to create the neighbour matrices
+        lag = np.arange(-(N-2), N-1, 1) 
+        for n in lag:
+        # Looping through the argmax
+            for m in np.arange(len(ifgs)):
+            # Looping through the dates 
+                esum = np.zeros((r, c))*1j
+                if 1 <= m+n <= N-2:
+                    
+                    # Center pixel
+                    pc = ifgs[m]
+                    # Neighbour pixel (same matrix but shifted some way based on h & v.
+                    pn = padding(ifgs[m+n], h, v)
+                    e = coherence(pc, pn)
+                    # Exponential sum
+                    esum += e
+                else:
+                    pass
                 
-                # Add to array to perform argmax on
-                argarray.append(esum)
-            # Looks at all the sums for a specific pixel across all the time lags and finds
-            # the index of the max value
-            print (np.asarray(argarray).shape)
-            argmaxix = np.argmax(argarray, axis=0)
+            # Add to array to perform argmax on
+            argarray.append(esum)
+        # Looks at all the sums for a specific pixel across all the time lags and finds
+        # the index of the max value
+        # print (np.asarray(argarray).shape)
+        argmaxix = np.argmax(argarray, axis=0)
         
-            # If the index of the argmax for a specific value is in the middle of the stack
-            # (meaning zero time lag) then it is a STIP. This adds 1 to that pixel if it is
-            # otherwise adds zero.
-            # STIP_count is therefore a 2d array (with same dimensions as ifgs) where the 
-            # number corresponds to the number of STIP pixels.
-            STIP_count += (argmaxix == st.median(range(len(argarray))))*1
-        
+        # If the index of the argmax for a specific value is in the middle of the stack
+        # (meaning zero time lag) then it is a STIP. This adds 1 to that pixel if it is
+        # otherwise adds zero.
+        # STIP_count is therefore a 2d array (with same dimensions as ifgs) where the 
+        # number corresponds to the number of STIP pixels.
+        STIP_mask = (argmaxix == st.median(range(len(argarray))))
+
+        STIP_count += STIP_mask*1
+
+            
+        # neighbourIndex(False, STIP_mask, h, v)
         # The loop is restarted for the next h and v values.
 
     return STIP_count
 
+def neighbourIndex(dlist, neighbourArr, mask, h, v):
+    
+    dim = [(i, j) for i in dlist for j in dlist if (i, j)!=(0, 0)]
+
+    i1, i2 = np.where(dim==(h, v))
+
+def radCoor(arr):
+    r, c = arr.shape
+
+    x = np.asarray(([i for i in range(c)]*r)).reshape((r, c))
+    y = np.asarray(([[i]*c for i in range(r)]))
+
+    plt.scatter(x, y, c=arr, s=0.5)
+    plt.show()
+    return ""
 
 def coherence(arr1, arr2):
     return np.exp(1j*arr1)*np.exp(-1j*arr2)
 
 def padding(arr, h, v):
     """If h -ve then add columns to the left. +ve add columns to the right
-    IF v -ve then add rows to the top. +ve add rows to the right."""
+    IF v -ve then add rows to the top. +ve add rows to the bottom."""
     
     r,c = arr.shape
     
@@ -176,12 +199,20 @@ def padding(arr, h, v):
 def neighbourhood(windowDim):
     """setting up the neighbourhoods (number of rows/cols for padding)"""
     
-    d = round(int(windowDim)/2)
-    
-    dlist = np.arange(-d, d+1, 1)
-    dlist = dlist[np.abs(dlist)>0]
+    d = int((windowDim-1)/2)
+    drange = np.arange(-d, d+1, 1)
+    dlist = [(i, j) for i in drange for j in drange if (i, j)!=(0, 0)]
+
     
     return dlist
+
+def cropData(arr):
+    n=60
+    if len(list(arr.shape))==3:
+        cropped = arr[:, :, :-n]
+    elif len(list(arr.shape))==2:
+        cropped = arr[:,:-n]
+    return cropped
 
 def cityblock(n):
     center = np.pad(np.arange(n+1), (n,0), 'reflect')
@@ -261,11 +292,11 @@ def scatter(lon, lat, col):
 
 f = open_hdf(fn2)
 
-phase = np.asarray(ext_data('Phase', f))
-lon = np.asarray(ext_data('Longitude', f))
-lat = np.asarray(ext_data('Latitude', f))
+phase = cropData(np.asarray(ext_data('Phase', f)))
+lon = cropData(np.asarray(ext_data('Longitude', f)))
+lat = cropData(np.asarray(ext_data('Latitude', f)))
 
-#count = STIP(N, w, phase)
+count = STIP(N, w, phase)
 
 #np.savetxt(f'STIP_{int(w)}by{int(w)}_{int(N)}dates_comp.csv', count, delimiter=',')
 
