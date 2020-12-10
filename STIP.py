@@ -148,8 +148,6 @@ def STIP(N, window, ifgs):
         
         STIP_count += STIP_mask*1
 
-            
-        # neighbourIndex(False, STIP_mask, h, v)
         # The loop is restarted for the next h and v values.
 
     return STIP_count, nhistory
