@@ -274,7 +274,7 @@ def hist(array, nbins):
         arrayf = array.copy()
     fig, ax = plt.subplots()
 
-    ax.hist(arrayf, nbins)
+    ax.hist(arrayf, nbins, rwidth=0.95)
     plt.show()
 
 def read_csv(fname):
