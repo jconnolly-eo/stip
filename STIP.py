@@ -17,6 +17,7 @@ import re
 import h5py as h5
 import statistics as st
 import matplotlib.pyplot as plt
+import time
 
 print ("\nModules loaded\n")
 
@@ -64,6 +65,8 @@ def ext_data(header, hdfo):
         data = hdfo[header]
     except KeyError:
         print (f'No dataset for {header} found. Set to False. \n')
+        headers = list(hdfo.keys())
+        print ('Possible headers: \n', headers)
         data = False
     return data
     
@@ -94,6 +97,7 @@ def STIP(N, window, ifgs):
     """Implimentation of STIP
     N = no. of SLCs
     N-1 = no. of IFGs"""
+    t1 = time.time()
     dates = np.asarray(ext_data('Date', f))
     ifgs = ifgs[-(N-1):]
     datesn, r, c = ifgs.shape # For dates, rows, columns
@@ -104,33 +108,38 @@ def STIP(N, window, ifgs):
     nhistory = np.empty((len(dlist), r, c), dtype=object)
     cmpx = 1j
     for h, v in dlist:
-        argarray = []
+        # argarray = []
+        
          
         print (f'h={h}, v={v}')
         # Looping through the padding to create the neighbour matrices
         lag = np.arange(-(N-2), N-1, 1) 
         zlagix = int(np.where(lag==0)[0])
-        
-        for n in lag:
+        argarray = np.zeros((len(lag), r, c))*cmpx
+        for nix, n in enumerate(lag):
+            print (f'n={n}')
         # Looping through the argmax
             esum = np.zeros((r, c))*1j
             for m in np.arange(len(ifgs)):
             # Looping through the dates 
                 
                 if 1 <= m+n <= N-2:
-                    
+                    print (f'm={m}')
                     # Center pixel
                     pc = ifgs[m]
                     # Neighbour pixel (same matrix but shifted some way based on h & v.
                     pn = padding(ifgs[m+n], h, v)
+                    padmask = (pn==0)
                     e = coherence(pc, pn)
+                    e[padmask] = 0
                     # Exponential sum
                     esum += e
                 else:
                     pass
                 
             # Add to array to perform argmax on
-            argarray.append(esum)
+            # argarray.append(esum)
+            argarray[nix] = esum
         # Looks at all the sums for a specific pixel across all the time lags and finds
         # the index of the max value
         # print (np.asarray(argarray).shape)
@@ -149,8 +158,10 @@ def STIP(N, window, ifgs):
         STIP_count += STIP_mask*1
 
         # The loop is restarted for the next h and v values.
-
+    t2 = time.time()
+    print (t2-t1)
     return STIP_count, nhistory
+
 
 def maskTransform(dlist, mask, h, v):
     
@@ -258,13 +269,15 @@ def normalise(arr):
     
 #===================PLOTTING FUNCTIONS=====================
 
-def radCoor(arr):
+def radCoor(arr, colour=True, mask=True):
     r, c = arr.shape
 
     x = np.asarray(([i for i in range(c)]*r)).reshape((r, c))
     y = np.asarray(([[i]*c for i in range(r)]))
-    if not mask:
-        plt.scatter(x, y, c=arr, s=0.5)
+    if colour:
+        plt.scatter(x[mask], y[mask], c=arr, s=0.5)
+    else:
+        plt.scatter(x[mask], y[mask], s=0.5)
     plt.show()
     return ""
 
@@ -325,19 +338,32 @@ def scatter(lon, lat, col):
     plt.savefig('STIP_scatter.png')
     plt.show()
 
-
+def cumulative(count):
+    c = []
+    for i in range(np.max(count)):
+        mask = (count > i)
+        c.append(np.sum(mask*1))
+        
+    plt.plot(c)
+    plt.show()
+    
 
 # main()
 
 f = open_hdf(fn2)
 
 phase = cropData(np.asarray(ext_data('Phase', f)))
+#d, r, c = phase.shape
+#noise = cropData(np.asarray(np.random.random((d, r, c))))*2*np.pi - np.pi
+
 lon = cropData(np.asarray(ext_data('Longitude', f)))
 lat = cropData(np.asarray(ext_data('Latitude', f)))
 
-count, nhistory = STIP(N, w, phase)
+# count, nhistory = STIP(N, w, phase)
 
-write_hdf("w11d18.hdf5", count, nhistory)
+#count, nhistory = STIP(N, w, noise)
+#write_hdf(f"w{int(w)}d{int(N)}_NOISE.hdf5", count)
+# write_hdf(f"w{int(w)}d{int(N)}.hdf5", count, nhistory)
 
 
 #np.savetxt(f'STIP_{int(w)}by{int(w)}_{int(N)}dates_comp.csv', count, delimiter=',')
