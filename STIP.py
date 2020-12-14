@@ -17,6 +17,7 @@ import re
 import h5py as h5
 import statistics as st
 import matplotlib.pyplot as plt
+import time
 
 print ("\nModules loaded\n")
 
@@ -28,10 +29,13 @@ fn2 = r'/home/jacob/InSAR_workspace/data/doncaster/data_jacob_doncaster.h5'
 #fn = r'/nfs/a1/insar/sentinel1/UK/jacob_doncaster/vel_jacob_doncaster.h5'
 #fn2 = r'/nfs/a1/insar/sentinel1/UK/jacob_doncaster/data_jacob_doncaster.h5'
 
+#==================PARAMETERS======================
+
 N = 18
 w = 11
 
 #=====================CODE=========================
+
 class Usage(Exception):
     def __init__(self, msg):
         self.msg = msg
@@ -44,20 +48,13 @@ def main():
     lat = ext_data('Latitude', f)
 
     
-#===================================================
+#==================READING DATA====================
         
 def open_hdf(fn):
     """Open the file and assign vars to datasets. """ 
     global f
     f = h5.File(fn, 'r')
-    headers = list(f.keys())
-#    vel = ext_data('Velocity', f)
-#    phase = ext_data('Phase', f)
-
-#    lon = ext_data('Longitude', f)
-#    lat = ext_data('Latitude', f)
-#    dates = ext_data('Date', f)
-    
+    headers = list(f.keys())    
     return f
 
 def ext_data(header, hdfo):
@@ -68,68 +65,81 @@ def ext_data(header, hdfo):
         data = hdfo[header]
     except KeyError:
         print (f'No dataset for {header} found. Set to False. \n')
+        headers = list(hdfo.keys())
+        print ('Possible headers: \n', headers)
         data = False
     return data
+    
+def read_csv(fname):
+    return np.genfromtxt(fname, delimiter=',')
+    
+#=================WRITING DATA=====================
 
-def normalise(arr):
-    """To normalise an array so that is sums to one."""
-    arrc = np.asarray(np.asarray(arr).copy())
-    maxs = []
-    for k in arrc:
-        mask = ~np.isnan(k)
-        if len(k[mask]) > 0:
-            maxs.append(max(k[mask]))
-    maxn = max(maxs)
-    n, m = arr.shape
-    for i in range(n):
-        arrc[i] = arrc[i]/maxn
-    return arrc, maxn
+def write_csv(name, arr):
+    np.savetxt(name, arr, delimiter=',')
+    return
+    
+def write_hdf(name, *dsets):
+    print (f'Writing to {name}.\n')
+    
+    f = h5.File(name, "w")
+    for ix, dset in enumerate(dsets):
+        shape = dset.shape
+        dsetname = f"data_{int(ix)}"
+        d = f.create_dataset(dsetname, shape, data=dset)
+    f.close()
+    statement = f"Data saved at {name}"
+    return statement
+
+#================MAIN FUNCTIONS====================
 
 def STIP(N, window, ifgs):
     """Implimentation of STIP
     N = no. of SLCs
     N-1 = no. of IFGs"""
+    t1 = time.time()
     dates = np.asarray(ext_data('Date', f))
     ifgs = ifgs[-(N-1):]
     datesn, r, c = ifgs.shape # For dates, rows, columns
-    print (r, c)
+
     STIP_count = np.zeros((r, c))
     dlist = neighbourhood(window)
     print (dlist)
-#    index = []
-#    for i in range(r):
-#        for j in range(c):
-#            index.append((i, j))
-#    indexDict = {i: None for i in index}
+    nhistory = np.empty((len(dlist), r, c), dtype=object)
     cmpx = 1j
     for h, v in dlist:
-        argarray = []
+        # argarray = []
+        
          
-        print (f'Starting with h={h}, v={v}')
+        print (f'h={h}, v={v}')
         # Looping through the padding to create the neighbour matrices
         lag = np.arange(-(N-2), N-1, 1) 
         zlagix = int(np.where(lag==0)[0])
-        
-        for n in lag:
+        argarray = np.zeros((len(lag), r, c))*cmpx
+        for nix, n in enumerate(lag):
+            print (f'n={n}')
         # Looping through the argmax
             esum = np.zeros((r, c))*1j
             for m in np.arange(len(ifgs)):
             # Looping through the dates 
                 
                 if 1 <= m+n <= N-2:
-                    
+                    print (f'm={m}')
                     # Center pixel
                     pc = ifgs[m]
                     # Neighbour pixel (same matrix but shifted some way based on h & v.
                     pn = padding(ifgs[m+n], h, v)
+                    padmask = (pn==0)
                     e = coherence(pc, pn)
+                    e[padmask] = 0
                     # Exponential sum
                     esum += e
                 else:
                     pass
                 
             # Add to array to perform argmax on
-            argarray.append(esum)
+            # argarray.append(esum)
+            argarray[nix] = esum
         # Looks at all the sums for a specific pixel across all the time lags and finds
         # the index of the max value
         # print (np.asarray(argarray).shape)
@@ -141,30 +151,38 @@ def STIP(N, window, ifgs):
         # STIP_count is therefore a 2d array (with same dimensions as ifgs) where the 
         # number corresponds to the number of STIP pixels.
         STIP_mask = (argmaxix == zlagix) #st.median(range(len(argarray))))
-
+        
+        hvmask, historyix = maskTransform(dlist, STIP_mask, h, v)
+        nhistory[historyix] = hvmask
+        
         STIP_count += STIP_mask*1
 
-            
-        # neighbourIndex(False, STIP_mask, h, v)
         # The loop is restarted for the next h and v values.
+    t2 = time.time()
+    print (t2-t1)
+    return STIP_count, nhistory
 
-    return STIP_count
 
-def neighbourIndex(dlist, neighbourArr, mask, h, v):
+def maskTransform(dlist, mask, h, v):
     
-    dim = [(i, j) for i in dlist for j in dlist if (i, j)!=(0, 0)]
+    ix = dlist.index((h, v))    
+    
+    r, c = mask.shape
+    maskf = mask.flatten()
+    l = np.empty((r, c), dtype=object).flatten()#[]
+    t = (h, v)
+    
+    for i, p in enumerate(maskf):
+        if p:
+            l[i] = t
+            # l.append(t)
+        else:
+            l[i] = np.nan
+            # l.append(np.nan)
+    
+    arrOut = np.asarray(l).reshape((r, c))
 
-    i1, i2 = np.where(dim==(h, v))
-
-def radCoor(arr):
-    r, c = arr.shape
-
-    x = np.asarray(([i for i in range(c)]*r)).reshape((r, c))
-    y = np.asarray(([[i]*c for i in range(r)]))
-    if not mask:
-        plt.scatter(x, y, c=arr, s=0.5)
-    plt.show()
-    return ""
+    return arrOut, ix
 
 def coherence(arr1, arr2):
     return np.exp(1j*arr1)*np.exp(-1j*arr2)
@@ -233,7 +251,36 @@ def cityblock(n):
     truth_coords = np.where(truth==1)
     
     return cb, truth, truth_coords
+
     
+def normalise(arr):
+    """To normalise an array so that is sums to one."""
+    arrc = np.asarray(np.asarray(arr).copy())
+    maxs = []
+    for k in arrc:
+        mask = ~np.isnan(k)
+        if len(k[mask]) > 0:
+            maxs.append(max(k[mask]))
+    maxn = max(maxs)
+    n, m = arr.shape
+    for i in range(n):
+        arrc[i] = arrc[i]/maxn
+    return arrc, maxn
+    
+#===================PLOTTING FUNCTIONS=====================
+
+def radCoor(arr, colour=True, mask=True):
+    r, c = arr.shape
+
+    x = np.asarray(([i for i in range(c)]*r)).reshape((r, c))
+    y = np.asarray(([[i]*c for i in range(r)]))
+    if colour:
+        plt.scatter(x[mask], y[mask], c=arr, s=0.5)
+    else:
+        plt.scatter(x[mask], y[mask], s=0.5)
+    plt.show()
+    return ""
+
 def time_series(data, dateix, dates, mask):
     fig, ax = plt.subplots()
     print ('Created subplot \n')
@@ -277,9 +324,6 @@ def hist(array, nbins):
     ax.hist(arrayf, nbins, rwidth=0.95)
     plt.show()
 
-def read_csv(fname):
-    return np.genfromtxt(fname, delimiter=',')
-
 def contour(arr):
     fig, ax = plt.subplots()
     contf = ax.contourf(arr)
@@ -294,15 +338,33 @@ def scatter(lon, lat, col):
     plt.savefig('STIP_scatter.png')
     plt.show()
 
+def cumulative(count):
+    c = []
+    for i in range(np.max(count)):
+        mask = (count > i)
+        c.append(np.sum(mask*1))
+        
+    plt.plot(c)
+    plt.show()
+    
+
 # main()
 
 f = open_hdf(fn2)
 
 phase = cropData(np.asarray(ext_data('Phase', f)))
+#d, r, c = phase.shape
+#noise = cropData(np.asarray(np.random.random((d, r, c))))*2*np.pi - np.pi
+
 lon = cropData(np.asarray(ext_data('Longitude', f)))
 lat = cropData(np.asarray(ext_data('Latitude', f)))
 
-count = STIP(N, w, phase)
+# count, nhistory = STIP(N, w, phase)
+
+#count, nhistory = STIP(N, w, noise)
+#write_hdf(f"w{int(w)}d{int(N)}_NOISE.hdf5", count)
+# write_hdf(f"w{int(w)}d{int(N)}.hdf5", count, nhistory)
+
 
 #np.savetxt(f'STIP_{int(w)}by{int(w)}_{int(N)}dates_comp.csv', count, delimiter=',')
 
