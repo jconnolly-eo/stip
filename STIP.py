@@ -105,7 +105,8 @@ def STIP(N, window, ifgs):
     STIP_count = np.zeros((r, c))
     dlist = neighbourhood(window)
     print (dlist)
-    nhistory = np.empty((len(dlist), r, c), dtype=object)
+    hhistory = np.empty((len(dlist), r, c))
+    vhistory = np.empty((len(dlist), r, c))
     cmpx = 1j
     for h, v in dlist:
         # argarray = []
@@ -117,14 +118,14 @@ def STIP(N, window, ifgs):
         zlagix = int(np.where(lag==0)[0])
         argarray = np.zeros((len(lag), r, c))*cmpx
         for nix, n in enumerate(lag):
-            print (f'n={n}')
+            #print (f'n={n}')
         # Looping through the argmax
             esum = np.zeros((r, c))*1j
             for m in np.arange(len(ifgs)):
             # Looping through the dates 
                 
                 if 1 <= m+n <= N-2:
-                    print (f'm={m}')
+                    #print (f'm={m}')
                     # Center pixel
                     pc = ifgs[m]
                     # Neighbour pixel (same matrix but shifted some way based on h & v.
@@ -152,15 +153,16 @@ def STIP(N, window, ifgs):
         # number corresponds to the number of STIP pixels.
         STIP_mask = (argmaxix == zlagix) #st.median(range(len(argarray))))
         
-        hvmask, historyix = maskTransform(dlist, STIP_mask, h, v)
-        nhistory[historyix] = hvmask
+        hmask, vmask, historyix = maskTransform(dlist, STIP_mask, h, v)
+        hhistory[historyix] = hmask
+        vhistory[historyix] = vmask
         
         STIP_count += STIP_mask*1
 
         # The loop is restarted for the next h and v values.
     t2 = time.time()
     print (t2-t1)
-    return STIP_count, nhistory
+    return STIP_count, hhistory, vhistory
 
 
 def maskTransform(dlist, mask, h, v):
@@ -169,20 +171,22 @@ def maskTransform(dlist, mask, h, v):
     
     r, c = mask.shape
     maskf = mask.flatten()
-    l = np.empty((r, c), dtype=object).flatten()#[]
+    ha = np.empty((r, c)).flatten()
+    va = np.empty((r, c)).flatten()
     t = (h, v)
     
     for i, p in enumerate(maskf):
         if p:
-            l[i] = t
+            ha[i] = h
+            va[i] = v
             # l.append(t)
         else:
-            l[i] = np.nan
+            ha[i], va[i] = np.nan, np.nan
             # l.append(np.nan)
-    
-    arrOut = np.asarray(l).reshape((r, c))
+    arrhOut = np.asarray(ha).reshape((r, c))
+    arrvOut = np.asarray(va).reshape((r, c))
 
-    return arrOut, ix
+    return arrhOut, arrvOut,  ix
 
 def coherence(arr1, arr2):
     return np.exp(1j*arr1)*np.exp(-1j*arr2)
@@ -359,11 +363,11 @@ phase = cropData(np.asarray(ext_data('Phase', f)))
 lon = cropData(np.asarray(ext_data('Longitude', f)))
 lat = cropData(np.asarray(ext_data('Latitude', f)))
 
-# count, nhistory = STIP(N, w, phase)
+count, hhistory, vhistory = STIP(N, w, phase)
 
 #count, nhistory = STIP(N, w, noise)
-#write_hdf(f"w{int(w)}d{int(N)}_NOISE.hdf5", count)
-# write_hdf(f"w{int(w)}d{int(N)}.hdf5", count, nhistory)
+
+write_hdf(f"w{int(w)}d{int(N)}.hdf5", count, hhistory, vhistory)
 
 
 #np.savetxt(f'STIP_{int(w)}by{int(w)}_{int(N)}dates_comp.csv', count, delimiter=',')
