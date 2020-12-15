@@ -40,34 +40,35 @@ class Usage(Exception):
     def __init__(self, msg):
         self.msg = msg
 
-def main():
-    f = open_hdf(fn2)
-    dates = ext_data('Date', f)
-    phase = ext_data('Phase', f)
-    lon = ext_data('Longitude', f)
-    lat = ext_data('Latitude', f)
+def main(N, w):
+    phase = ext_data(fn2, 'Phase')
+    count, hhist, vhist = STIP(N, w, phase)
+    
+    #write_hdf(f"w{int(w)}d{int(N)}.hdf5", count, hhist, vhist)
+    write_hdf(f"coh.hdf5", count, hhist, vhist)
 
     
 #==================READING DATA====================
         
-def open_hdf(fn):
-    """Open the file and assign vars to datasets. """ 
-    global f
-    f = h5.File(fn, 'r')
-    headers = list(f.keys())    
-    return f
+#def open_hdf(fn):
+#    """Open the file and assign vars to datasets. """ 
+#    global f
+#    f = h5.File(fn, 'r')
+#    headers = list(f.keys())    
+#    return f
 
-def ext_data(header, hdfo):
+def ext_data(file, header):
     """Short function to extract data from the file. Returns False if no data is found
     for that header. """
-
-    try:
-        data = hdfo[header]
-    except KeyError:
-        print (f'No dataset for {header} found. Set to False. \n')
-        headers = list(hdfo.keys())
-        print ('Possible headers: \n', headers)
-        data = False
+    with h5.File(file) as f:
+        try:
+            data = np.asarray(f[header])
+            
+        except KeyError:
+            print (f'No dataset for {header} found. Set to False. \n')
+            headers = list(f.keys())
+            print ('Possible headers: \n', headers)
+            data = False
     return data
     
 def read_csv(fname):
@@ -98,7 +99,7 @@ def STIP(N, window, ifgs):
     N = no. of SLCs
     N-1 = no. of IFGs"""
     t1 = time.time()
-    dates = np.asarray(ext_data('Date', f))
+#    dates = np.asarray(ext_data('Date', f))
     ifgs = ifgs[-(N-1):]
     datesn, r, c = ifgs.shape # For dates, rows, columns
 
@@ -201,23 +202,23 @@ def padding(arr, h, v):
     
     if h < 0:
         # Adding columns to left
-        to_add = np.zeros((r, np.abs(h)))
+        to_add = np.zeros((r, np.abs(h)))# - np.inf
         arr_new = np.concatenate((to_add, arr_new[:,:h]), axis=1)
         
     elif h > 0: 
         # Adding columns to right
-        to_add = np.zeros((r, h))
+        to_add = np.zeros((r, h))# - np.inf
         arr_new = np.concatenate((arr_new[:,h:], to_add), axis=1)
     else:
         pass
         
     if v < 0:
         # Adding rows to the top
-        to_add = np.zeros((np.abs(v), c))
+        to_add = np.zeros((np.abs(v), c))# - np.inf
         arr_new = np.concatenate((to_add, arr_new[:v,:]), axis=0)
     elif v > 0:
         # Adding rows to the bottom
-        to_add = np.zeros((v, c))
+        to_add = np.zeros((v, c))# - np.inf
         arr_new = np.concatenate((arr_new[v:,:], to_add), axis=0)
     else:
         pass
@@ -279,7 +280,8 @@ def radCoor(arr, colour=True, mask=True):
     x = np.asarray(([i for i in range(c)]*r)).reshape((r, c))
     y = np.asarray(([[i]*c for i in range(r)]))
     if colour:
-        plt.scatter(x[mask], y[mask], c=arr, s=0.5)
+        p = plt.scatter(x[mask], y[mask], c=arr[mask], s=0.5)
+        plt.colorbar(p)
     else:
         plt.scatter(x[mask], y[mask], s=0.5)
     plt.show()
@@ -316,7 +318,7 @@ def time_series(data, dateix, dates, mask):
             
     return
 
-def hist(array, nbins):
+def hist(array):
     try:
         a, b = array.shape
         arrayf = array.flatten()
@@ -324,8 +326,8 @@ def hist(array, nbins):
         print ('Array was already 1D - proceeding')
         arrayf = array.copy()
     fig, ax = plt.subplots()
-
-    ax.hist(arrayf, nbins, rwidth=0.95)
+    bins = np.arange(0, 110, 5) - 2.5
+    ax.hist(arrayf, bins, rwidth=0.95)
     plt.show()
 
 def contour(arr):
@@ -351,23 +353,21 @@ def cumulative(count):
     plt.plot(c)
     plt.show()
     
+main(6, 11)
+#f = open_hdf(fn2)
 
-# main()
-
-f = open_hdf(fn2)
-
-phase = cropData(np.asarray(ext_data('Phase', f)))
+#phase = (np.asarray(ext_data(fn2, 'Phase')))
 #d, r, c = phase.shape
 #noise = cropData(np.asarray(np.random.random((d, r, c))))*2*np.pi - np.pi
 
-lon = cropData(np.asarray(ext_data('Longitude', f)))
-lat = cropData(np.asarray(ext_data('Latitude', f)))
+#lon = cropData(np.asarray(ext_data('Longitude', f)))
+#lat = cropData(np.asarray(ext_data('Latitude', f)))
 
-count, hhistory, vhistory = STIP(N, w, phase)
+#count, hhistory, vhistory = STIP(N, w, phase)
 
 #count, nhistory = STIP(N, w, noise)
 
-write_hdf(f"w{int(w)}d{int(N)}.hdf5", count, hhistory, vhistory)
+#write_hdf(f"w{int(w)}d{int(N)}.hdf5", count, hhistory, vhistory)
 
 
 #np.savetxt(f'STIP_{int(w)}by{int(w)}_{int(N)}dates_comp.csv', count, delimiter=',')
