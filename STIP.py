@@ -18,6 +18,7 @@ import h5py as h5
 import statistics as st
 import matplotlib.pyplot as plt
 import time
+import random
 
 print ("\nModules loaded\n")
 
@@ -353,25 +354,32 @@ def cumulative(count):
     plt.plot(c)
     plt.show()
     
-main(6, 11)
-#f = open_hdf(fn2)
+    
+def plot_neighbours(x,y, hhist, vhist, phase):
+    """Plot the neighbours"""
+    data=[]
+    mask = ~np.isnan(hhist[:, y, x])
+    print (mask)
+    coords = tuple(zip(hhist[:, y, x][mask], vhist[:, y, x][mask]))
+    print (coords)
+    fig, ax = plt.subplots()
+    for h, v in coords:
+        series = phase[:, int(y+v), int(x+h)]
+        data.append(series)
+    
+    for d in data:
+        ax.plot(d, 'b-')
+    ax.plot(phase[:, int(y), int(x)], 'r-')
+    plt.show()
+    
+
+
+#main(N, w)
+
 
 #phase = (np.asarray(ext_data(fn2, 'Phase')))
 #d, r, c = phase.shape
 #noise = cropData(np.asarray(np.random.random((d, r, c))))*2*np.pi - np.pi
 
-#lon = cropData(np.asarray(ext_data('Longitude', f)))
-#lat = cropData(np.asarray(ext_data('Latitude', f)))
-
-#count, hhistory, vhistory = STIP(N, w, phase)
-
-#count, nhistory = STIP(N, w, noise)
-
-#write_hdf(f"w{int(w)}d{int(N)}.hdf5", count, hhistory, vhistory)
-
-
-#np.savetxt(f'STIP_{int(w)}by{int(w)}_{int(N)}dates_comp.csv', count, delimiter=',')
-
-# scatter(lon, lat, count)
 
 
