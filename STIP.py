@@ -19,6 +19,7 @@ import statistics as st
 import matplotlib.pyplot as plt
 import time
 import random
+import cmath
 
 print ("\nModules loaded\n")
 
@@ -42,11 +43,11 @@ class Usage(Exception):
         self.msg = msg
 
 def main(N, w):
-    phase = ext_data(fn2, 'Phase')
+    phase = extractData(fn2, 'Phase')
     count, hhist, vhist = STIP(N, w, phase)
     
     #write_hdf(f"w{int(w)}d{int(N)}.hdf5", count, hhist, vhist)
-    write_hdf(f"coh.hdf5", count, hhist, vhist)
+    hdfWrite(f"coh.hdf5", count, hhist, vhist)
 
     
 #==================READING DATA====================
@@ -58,7 +59,7 @@ def main(N, w):
 #    headers = list(f.keys())    
 #    return f
 
-def ext_data(file, header):
+def extractData(file, header):
     """Short function to extract data from the file. Returns False if no data is found
     for that header. """
     with h5.File(file) as f:
@@ -72,16 +73,16 @@ def ext_data(file, header):
             data = False
     return data
     
-def read_csv(fname):
+def csvRead(fname):
     return np.genfromtxt(fname, delimiter=',')
     
 #=================WRITING DATA=====================
 
-def write_csv(name, arr):
+def csvWrite(name, arr):
     np.savetxt(name, arr, delimiter=',')
     return
     
-def write_hdf(name, *dsets):
+def hdfWrite(name, *dsets):
     print (f'Writing to {name}.\n')
     
     f = h5.File(name, "w")
@@ -100,7 +101,7 @@ def STIP(N, window, ifgs):
     N = no. of SLCs
     N-1 = no. of IFGs"""
     t1 = time.time()
-#    dates = np.asarray(ext_data('Date', f))
+#    dates = np.asarray(extractData('Date', f))
     ifgs = ifgs[-(N-1):]
     datesn, r, c = ifgs.shape # For dates, rows, columns
 
@@ -225,6 +226,41 @@ def padding(arr, h, v):
         pass
         
     return arr_new
+    
+def padReflection(arr, h, v):
+
+    r, c = arr.shape
+    
+    arr_new=arr.copy()
+    
+    tl = h < 0 and v < 0
+    bl = h < 0 and v > 0
+    tr = h > 0 and v < 0 
+    br = h > 0 and v > 0
+    
+    if h < 0:
+        left = arr.T[::-1].T[:,h:]
+    elif h > 0:
+        right = arr.T[::-1].T[:,:h]
+    else: 
+        pass
+        
+    if v < 0:
+        top = arr[::-1][v:, :]
+    elif v > 0:
+        bottom = arr[::-1][:v, :]
+    else:
+        pass
+        
+    if tl:
+        pass
+    elif bl:
+        pass
+    elif tr:
+        pass
+    elif br: 
+        pass
+        
 
 def neighbourhood(windowDim):
     """setting up the neighbourhoods (number of rows/cols for padding)"""
@@ -237,7 +273,7 @@ def neighbourhood(windowDim):
     return dlist
 
 def cropData(arr):
-    n=60
+    n=79
     if len(list(arr.shape))==3:
         cropped = arr[:, :, :-n]
     elif len(list(arr.shape))==2:
@@ -273,6 +309,33 @@ def normalise(arr):
         arrc[i] = arrc[i]/maxn
     return arrc, maxn
     
+def normalisedPhase(phase, amp, tl, br):
+    """Function to normalise the complex phase of an IFG based 
+    on a region given by the coordinates tl (top-left) and br (bottom-right)."""
+    dim = phase.shape
+    
+    pArrOut = np.zeros(dim)
+    
+    #print (tl[0], br[0], tl[1], br[1])
+    for i in range(dim[0]):
+    
+        pRegion = phase[i, tl[0]:br[0], tl[1]:br[1]]
+        aRegion = amp[i, tl[0]:br[0], tl[1]:br[1]]
+        #print (pRegion, aRegion)
+        complexRegion = np.exp(1j*pRegion)*aRegion
+        
+        sumRegion = np.sum(complexRegion)
+        #print (sumRegion)
+        pReturn = cmath.phase(sumRegion)
+        #print (pReturn)
+        
+        pArr = phase[i] - pReturn
+        
+        pArrOut[i] = pArr
+    
+    return pArrOut 
+        
+    
 #===================PLOTTING FUNCTIONS=====================
 
 def radCoor(arr, colour=True, mask=True):
@@ -286,7 +349,7 @@ def radCoor(arr, colour=True, mask=True):
     else:
         plt.scatter(x[mask], y[mask], s=0.5)
     plt.show()
-    return ""
+    
 
 def time_series(data, dateix, dates, mask):
     fig, ax = plt.subplots()
@@ -313,7 +376,7 @@ def time_series(data, dateix, dates, mask):
     print (f'Plotting {len(datat)}')
     for series in datat:
 
-        ax.plot(datesf, series, '-')
+        ax.plot(datesf, series, '.')
 
     plt.show()
             
@@ -355,7 +418,7 @@ def cumulative(count):
     plt.show()
     
     
-def plot_neighbours(x,y, hhist, vhist, phase):
+def plotNeighbours(x,y, hhist, vhist, phase):
     """Plot the neighbours"""
     data=[]
     mask = ~np.isnan(hhist[:, y, x])
@@ -366,18 +429,78 @@ def plot_neighbours(x,y, hhist, vhist, phase):
     for h, v in coords:
         series = phase[:, int(y+v), int(x+h)]
         data.append(series)
-    
+    print (len(data))
+    centralPhase = phase[:, int(y), int(x)]
+    centralAmp = amp[:, int(y), int(x)]
     for d in data:
-        ax.plot(d, 'b-')
-    ax.plot(phase[:, int(y), int(x)], 'r-')
+        ax.plot(d-centralPhase, 'b.')
+    ax.plot(centralPhase-centralPhase, 'r.')
+    plt.show()
+
+def plotNeighboursComp(x,y, hhist, vhist, phase, amp):
+    """Plot the neighbours"""
+
+    #Lists to add the phase and amp data to 
+    dataPhase=[]
+    dataAmp=[]
+    
+    # Create a mask to remove the pixels with no STIPs
+    mask = ~np.isnan(hhist[:, y, x])
+    
+    # Create a list of tuples with the coordinates of the neighbouring
+    # STIP pixels.
+    coords = tuple(zip(hhist[:, y, x][mask], vhist[:, y, x][mask]))
+
+    # Append the data for the neighbours to the lists
+    for h, v in coords:
+        phaseSeries = phase[:, int(y+v), int(x+h)]
+        ampSeries = amp[:, int(y+v), int(x+h)]
+        dataPhase.append(phaseSeries)
+        dataAmp.append(ampSeries)
+    
+    # Calculate the complex version of the central pixel
+    centralPhase = phase[:, int(y), int(x)]
+    centralAmp = amp[:, int(y), int(x)]
+    centralComp = toComplex(centralPhase, centralAmp)
+    
+    print (centralComp)
+    # Create the axes
+    fig, ax = plt.subplots()
+    
+    # Plot each of the 
+    for p, a in zip(dataPhase, dataAmp):
+        comp = toComplex(p, a) - centralComp
+        print (comp)
+        normalised = np.asarray([cmath.phase(c) for c in comp])
+        ax.plot(normalised, 'b.')
+    ax.plot(centralPhase-centralPhase, 'r.')
     plt.show()
     
-
+def toComplex(p, a):
+    return np.exp(1j*p)*a
+    
+def av_comp(arr):
+    """    """
+    i = 0+1j
+    comp = np.exp(i*arr)
+    
+    avphase = cmath.phase(np.mean(comp))
+    
+    return avphase 
+    
+def indexCount(count, num):
+    l = zip(*np.where(count==num))
+    
+    
 
 #main(N, w)
+phase = cropData(extractData(fn2, 'Phase'))
+amp = cropData(extractData(fn2, 'Amplitude'))
 
-
-#phase = (np.asarray(ext_data(fn2, 'Phase')))
+count = cropData(extractData('w11d18.hdf5', 'data_0'))
+hhistory = cropData(extractData('w11d18.hdf5', 'data_1'))
+vhistory = cropData(extractData('w11d18.hdf5', 'data_2'))
+#phase = (np.asarray(extractData(fn2, 'Phase')))
 #d, r, c = phase.shape
 #noise = cropData(np.asarray(np.random.random((d, r, c))))*2*np.pi - np.pi
 
