@@ -5,11 +5,11 @@ time-series analysis.
 
 #=================MODULES=========================
 
-import sys
-import getopt
-import os
-import shutil
-import subprocess as subp
+#import sys
+#import getopt
+#import os
+#import shutil
+#import subprocess as subp
 # import sqlite3
 from datetime import datetime as dt
 import numpy as np
@@ -17,9 +17,11 @@ import re
 import h5py as h5
 import statistics as st
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 import time
 import random
 import cmath
+
 
 print ("\nModules loaded\n")
 
@@ -43,11 +45,11 @@ class Usage(Exception):
         self.msg = msg
 
 def main(N, w):
-    phase = extractData(fn2, 'Phase')
-    count, hhist, vhist = STIP(N, w, phase)
+    #phase_noise = extractData(fn2, 'Phase')
+    count, hhist, vhist = STIP(N, w, phase_noise)
     
-    #write_hdf(f"w{int(w)}d{int(N)}.hdf5", count, hhist, vhist)
-    hdfWrite(f"coh.hdf5", count, hhist, vhist)
+    hdfWrite(f"w{int(w)}d{int(N)}_noise.hdf5", count)#, hhist, vhist)
+    #hdfWrite(f"coh.hdf5", count, hhist, vhist)
 
     
 #==================READING DATA====================
@@ -338,16 +340,24 @@ def normalisedPhase(phase, amp, tl, br):
     
 #===================PLOTTING FUNCTIONS=====================
 
-def radCoor(arr, colour=True, mask=True):
+def radCoor(arr, colour=True, mask=True, region=[0, 0, 0, 0]):
     r, c = arr.shape
 
     x = np.asarray(([i for i in range(c)]*r)).reshape((r, c))
-    y = np.asarray(([[i]*c for i in range(r)]))
+    y = np.asarray(([[i]*c for i in np.arange(r)]))#, 0, -1)]))
+    fig, ax = plt.subplots()
+    plt.axis([np.nanmin(x), np.nanmax(x), np.nanmax(y), np.nanmin(y)])
     if colour:
-        p = plt.scatter(x[mask], y[mask], c=arr[mask], s=0.5)
-        plt.colorbar(p)
+        p = ax.scatter(x[mask], y[mask], c=arr[mask], s=0.5)
+        fig.colorbar(p, ax=ax)
     else:
-        plt.scatter(x[mask], y[mask], s=0.5)
+        ax.scatter(x[mask], y[mask], s=0.5)
+    
+    ax.add_patch(Rectangle((region[0], region[3]), region[2]-region[0], region[1]-region[3],
+                 edgecolor='red',
+                 fill=False,
+                 lw=1))
+    plt.axis([np.nanmin(x), np.nanmax(x), np.nanmin(y), np.nanmax(y)])
     plt.show()
     
 
@@ -495,14 +505,14 @@ def indexCount(count, num):
 
 #main(N, w)
 phase = cropData(extractData(fn2, 'Phase'))
-amp = cropData(extractData(fn2, 'Amplitude'))
+#amp = cropData(extractData(fn2, 'Amplitude'))
 
-count = cropData(extractData('w11d18.hdf5', 'data_0'))
-hhistory = cropData(extractData('w11d18.hdf5', 'data_1'))
-vhistory = cropData(extractData('w11d18.hdf5', 'data_2'))
+#count = cropData(extractData('w11-varied-dates/w11d18.hdf5', 'data_0'))
+#hhistory = cropData(extractData('w11-varied-dates/w11d18.hdf5', 'data_1'))
+#vhistory = cropData(extractData('w11-varied-dates/w11d18.hdf5', 'data_2'))
 #phase = (np.asarray(extractData(fn2, 'Phase')))
-#d, r, c = phase.shape
-#noise = cropData(np.asarray(np.random.random((d, r, c))))*2*np.pi - np.pi
+d, r, c = phase.shape
+phase_noise = np.asarray(np.random.random((d, r, c)))*2*np.pi - np.pi
 
 
 
