@@ -324,16 +324,19 @@ def normalisedPhase(phase, amp, tl, br):
         pRegion = phase[i, tl[0]:br[0], tl[1]:br[1]]
         aRegion = amp[i, tl[0]:br[0], tl[1]:br[1]]
         #print (pRegion, aRegion)
-        complexRegion = np.exp(1j*pRegion)*aRegion
+        complexRegion = toComplex(pRegion, aRegion) #np.exp(1j*pRegion)*aRegion
         
         sumRegion = np.sum(complexRegion)
         #print (sumRegion)
-        pReturn = cmath.phase(sumRegion)
+        
+        pArrOut[i] = phase[i]*sumRegion.conjugate()
+        
+        #pReturn = cmath.phase(sumRegion)
         #print (pReturn)
         
-        pArr = phase[i] - pReturn
+        #pArr = phase[i]pReturn
         
-        pArrOut[i] = pArr
+        #pArrOut[i] = pArr
     
     return pArrOut 
         
