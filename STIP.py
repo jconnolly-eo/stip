@@ -46,9 +46,10 @@ class Usage(Exception):
 
 def main(N, w):
     #phase_noise = extractData(fn2, 'Phase')
-    count, hhist, vhist = STIP(N, w, phase_noise)
+    normPhase = normalisedPhase(phase[-20:], amp[-20:], (918, 63), (1020, 77))
+    count, hhist, vhist = STIP(N, w, normPhase)
     
-    hdfWrite(f"w{int(w)}d{int(N)}_noise.hdf5", count)#, hhist, vhist)
+    hdfWrite(f"w{int(w)}d{int(N)}_norm.hdf5", count, hhist, vhist)
     #hdfWrite(f"coh.hdf5", count, hhist, vhist)
 
     
@@ -321,16 +322,20 @@ def normalisedPhase(phase, amp, tl, br):
     #print (tl[0], br[0], tl[1], br[1])
     for i in range(dim[0]):
     
-        pRegion = phase[i, tl[0]:br[0], tl[1]:br[1]]
-        aRegion = amp[i, tl[0]:br[0], tl[1]:br[1]]
-        #print (pRegion, aRegion)
+        pRegion = phase[i, dim[1]-br[1]:dim[1]-tl[1], tl[0]:br[0]]
+        aRegion = amp[i, dim[1]-br[1]:dim[1]-tl[1], tl[0]:br[0]]
+        print (pRegion.shape, aRegion.shape)
         complexRegion = toComplex(pRegion, aRegion) #np.exp(1j*pRegion)*aRegion
         
         sumRegion = np.sum(complexRegion)
         #print (sumRegion)
         
-        pArrOut[i] = phase[i]*sumRegion.conjugate()
+        normed = np.exp(1j*phase[i])*sumRegion.conjugate()
         
+        pArrOut[i] = np.arctan(normed.imag/normed.real)
+        
+        #pArrOut[i] = np.asarray([cmath.phase(p) for p in (np.exp(1j*phase[i])*sumRegion.conjugate()).flatten()]).reshape(phase[i].shape)
+        #pArrOut[i] = np.asarray([cmath.phase(])
         #pReturn = cmath.phase(sumRegion)
         #print (pReturn)
         
@@ -508,7 +513,7 @@ def indexCount(count, num):
 
 #main(N, w)
 phase = cropData(extractData(fn2, 'Phase'))
-#amp = cropData(extractData(fn2, 'Amplitude'))
+amp = cropData(extractData(fn2, 'Amplitude'))
 
 #count = cropData(extractData('w11-varied-dates/w11d18.hdf5', 'data_0'))
 #hhistory = cropData(extractData('w11-varied-dates/w11d18.hdf5', 'data_1'))
