@@ -317,22 +317,31 @@ def normalisedPhase(phase, amp, tl, br):
     on a region given by the coordinates tl (top-left) and br (bottom-right)."""
     dim = phase.shape
     
-    pArrOut = np.zeros(dim)
+    #pArrOut = np.zeros(dim)
+    pArrOut = phase.copy()
+    
+    pRegion = phase[0, dim[1]-br[1]:dim[1]-tl[1], tl[0]:br[0]]
+    aRegion = amp[0, dim[1]-br[1]:dim[1]-tl[1], tl[0]:br[0]]
+    complexRegion = toComplex(pRegion, aRegion)
+    sumRegion = np.sum(complexRegion)
+    normed = np.exp(1j*phase)*np.exp(1j*cmath.phase(sumRegion.conjugate()))
+    
+    pArrOut = np.arctan(normed.imag/normed.real)
     
     #print (tl[0], br[0], tl[1], br[1])
-    for i in range(dim[0]):
+    #for i in range(dim[0]):
     
-        pRegion = phase[i, dim[1]-br[1]:dim[1]-tl[1], tl[0]:br[0]]
-        aRegion = amp[i, dim[1]-br[1]:dim[1]-tl[1], tl[0]:br[0]]
-        print (pRegion.shape, aRegion.shape)
-        complexRegion = toComplex(pRegion, aRegion) #np.exp(1j*pRegion)*aRegion
+        #pRegion = phase[i, dim[1]-br[1]:dim[1]-tl[1], tl[0]:br[0]]
+        #aRegion = amp[i, dim[1]-br[1]:dim[1]-tl[1], tl[0]:br[0]]
+        #print (pRegion.shape, aRegion.shape)
+        #complexRegion = toComplex(pRegion, aRegion) #np.exp(1j*pRegion)*aRegion
         
-        sumRegion = np.sum(complexRegion)
+        #sumRegion = np.sum(complexRegion)
         #print (sumRegion)
         
-        normed = np.exp(1j*phase[i])*sumRegion.conjugate()
+        #normed = np.exp(1j*phase[i])*sumRegion.conjugate()
         
-        pArrOut[i] = np.arctan(normed.imag/normed.real)
+        #pArrOut[i] = np.arctan(normed.imag/normed.real)
         
         #pArrOut[i] = np.asarray([cmath.phase(p) for p in (np.exp(1j*phase[i])*sumRegion.conjugate()).flatten()]).reshape(phase[i].shape)
         #pArrOut[i] = np.asarray([cmath.phase(])
@@ -519,8 +528,8 @@ amp = cropData(extractData(fn2, 'Amplitude'))
 #hhistory = cropData(extractData('w11-varied-dates/w11d18.hdf5', 'data_1'))
 #vhistory = cropData(extractData('w11-varied-dates/w11d18.hdf5', 'data_2'))
 #phase = (np.asarray(extractData(fn2, 'Phase')))
-d, r, c = phase.shape
-phase_noise = np.asarray(np.random.random((d, r, c)))*2*np.pi - np.pi
+#d, r, c = phase.shape
+#phase_noise = np.asarray(np.random.random((d, r, c)))*2*np.pi - np.pi
 
 
 
