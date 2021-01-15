@@ -110,14 +110,14 @@ def STIP(N, window, ifgs):
 
     STIP_count = np.zeros((r, c))
     dlist = neighbourhood(window)
+    windowMask = circleMask(int((window-1)/2))
     print (dlist)
     hhistory = np.empty((len(dlist), r, c))
     vhistory = np.empty((len(dlist), r, c))
     cmpx = 1j
-    for h, v in dlist:
-        # argarray = []
-        
-         
+    maskeddlist = [dlist[i] for i in range(len(dlist)) if windowMask[i] == True]
+    print (maskeddlist)
+    for h, v in maskeddlist:
         print (f'h={h}, v={v}')
         # Looping through the padding to create the neighbour matrices
         lag = np.arange(-(N-2), N-1, 1) 
@@ -169,8 +169,24 @@ def STIP(N, window, ifgs):
     t2 = time.time()
     print (t2-t1)
     return STIP_count, hhistory, vhistory
-
-
+    
+def circleMask(radius):
+    
+#    if diameter%2:
+#       print ("You should use an odd diameter.")
+    
+    squareTransform = neighbourhood(radius*2 + 1)
+    
+    # Create square matrix for with mask for circle
+    #mask = np.ones((radius, radius))
+    Y, X = np.ogrid[-radius:radius+1, -radius:radius+1]
+    dist_from_center = np.sqrt((X)**2 + (Y)**2)
+    mask = dist_from_center <= radius
+    
+    maskFlatten = [mask[d[0]+radius, d[1]+radius] for d in squareTransform]
+    
+    return maskFlatten
+    
 def maskTransform(dlist, mask, h, v):
     
     ix = dlist.index((h, v))    
@@ -326,12 +342,12 @@ def normalisedPhase(phase, amp, tl, br):
 
         sumRegion = np.sum(toComplex(pRegion, aRegion))
         
-        normed = np.exp(1j*phase[i])*np.exp(1j*cmath.phase(sumRegion.conjugate()))
+        normed = np.exp(1j*phase[i])  *  np.exp(1j*cmath.phase(sumRegion)).conjugate()
         
         pArrOut[i] = np.arctan(normed.imag/normed.real)
     
     return pArrOut 
-        
+
     
 #===================PLOTTING FUNCTIONS=====================
 
@@ -410,7 +426,7 @@ def scatter(lon, lat, col):
     fig, ax = plt.subplots()
     sca = ax.scatter(lon, lat, c=col, s=1)
     cbar = fig.colorbar(sca)
-    plt.savefig('STIP_scatter.png')
+    #plt.savefig('STIP_scatter.png')
     plt.show()
 
 def cumulative(count):
