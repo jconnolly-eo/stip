@@ -317,40 +317,18 @@ def normalisedPhase(phase, amp, tl, br):
     on a region given by the coordinates tl (top-left) and br (bottom-right)."""
     dim = phase.shape
     
-    #pArrOut = np.zeros(dim)
     pArrOut = phase.copy()
     
-    pRegion = phase[0, dim[1]-br[1]:dim[1]-tl[1], tl[0]:br[0]]
-    aRegion = amp[0, dim[1]-br[1]:dim[1]-tl[1], tl[0]:br[0]]
-    complexRegion = toComplex(pRegion, aRegion)
-    sumRegion = np.sum(complexRegion)
-    normed = np.exp(1j*phase)*np.exp(1j*cmath.phase(sumRegion.conjugate()))
+    for i in range(dim[0]):
     
-    pArrOut = np.arctan(normed.imag/normed.real)
-    
-    #print (tl[0], br[0], tl[1], br[1])
-    #for i in range(dim[0]):
-    
-        #pRegion = phase[i, dim[1]-br[1]:dim[1]-tl[1], tl[0]:br[0]]
-        #aRegion = amp[i, dim[1]-br[1]:dim[1]-tl[1], tl[0]:br[0]]
-        #print (pRegion.shape, aRegion.shape)
-        #complexRegion = toComplex(pRegion, aRegion) #np.exp(1j*pRegion)*aRegion
+        pRegion = phase[i, dim[1]-br[1]:dim[1]-tl[1], tl[0]:br[0]]
+        aRegion = amp[i, dim[1]-br[1]:dim[1]-tl[1], tl[0]:br[0]]
+
+        sumRegion = np.sum(toComplex(pRegion, aRegion))
         
-        #sumRegion = np.sum(complexRegion)
-        #print (sumRegion)
+        normed = np.exp(1j*phase[i])*np.exp(1j*cmath.phase(sumRegion.conjugate()))
         
-        #normed = np.exp(1j*phase[i])*sumRegion.conjugate()
-        
-        #pArrOut[i] = np.arctan(normed.imag/normed.real)
-        
-        #pArrOut[i] = np.asarray([cmath.phase(p) for p in (np.exp(1j*phase[i])*sumRegion.conjugate()).flatten()]).reshape(phase[i].shape)
-        #pArrOut[i] = np.asarray([cmath.phase(])
-        #pReturn = cmath.phase(sumRegion)
-        #print (pReturn)
-        
-        #pArr = phase[i]pReturn
-        
-        #pArrOut[i] = pArr
+        pArrOut[i] = np.arctan(normed.imag/normed.real)
     
     return pArrOut 
         
