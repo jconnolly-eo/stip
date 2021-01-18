@@ -180,7 +180,7 @@ def circleMask(radius):
     # Create square matrix for with mask for circle
     #mask = np.ones((radius, radius))
     Y, X = np.ogrid[-radius:radius+1, -radius:radius+1]
-    dist_from_center = np.sqrt((X)**2 + (Y)**2)
+    dist_from_center = np.sqrt((X/3.966)**2 + (Y)**2)
     mask = dist_from_center <= radius
     
     maskFlatten = [mask[d[0]+radius, d[1]+radius] for d in squareTransform]
@@ -369,6 +369,9 @@ def radCoor(arr, colour=True, mask=True, region=[0, 0, 0, 0]):
                  fill=False,
                  lw=1))
     plt.axis([np.nanmin(x), np.nanmax(x), np.nanmin(y), np.nanmax(y)])
+    #fig.set_figheight(6)
+    #fig.set_figwidth(6*1.1297)
+    ax.set_aspect(1.0/ax.get_data_ratio()*0.8852)#1.1297)
     plt.show()
     
 
@@ -427,6 +430,7 @@ def scatter(lon, lat, col):
     sca = ax.scatter(lon, lat, c=col, s=1)
     cbar = fig.colorbar(sca)
     #plt.savefig('STIP_scatter.png')
+    ax.set_aspect(1.0/ax.get_data_ratio()*0.8852)
     plt.show()
 
 def cumulative(count):
