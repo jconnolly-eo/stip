@@ -111,11 +111,12 @@ def STIP(N, window, ifgs):
     STIP_count = np.zeros((r, c))
     dlist = neighbourhood(window)
     windowMask = circleMask(int((window-1)/2))
-    print (dlist)
-    hhistory = np.empty((len(dlist), r, c))
-    vhistory = np.empty((len(dlist), r, c))
+    # print (dlist)
+
     cmpx = 1j
     maskeddlist = [dlist[i] for i in range(len(dlist)) if windowMask[i] == True]
+    hhistory = np.empty((len(maskeddlist), r, c))
+    vhistory = np.empty((len(maskeddlist), r, c))
     print (maskeddlist)
     for h, v in maskeddlist:
         print (f'h={h}, v={v}')
@@ -159,7 +160,7 @@ def STIP(N, window, ifgs):
         # number corresponds to the number of STIP pixels.
         STIP_mask = (argmaxix == zlagix) #st.median(range(len(argarray))))
         
-        hmask, vmask, historyix = maskTransform(dlist, STIP_mask, h, v)
+        hmask, vmask, historyix = maskTransform(maskeddlist, STIP_mask, h, v)
         hhistory[historyix] = hmask
         vhistory[historyix] = vmask
         
@@ -442,63 +443,72 @@ def cumulative(count):
     plt.plot(c)
     plt.show()
     
+def plotNeighbours(x, y, hhist, vhist, phase):
+    """Plot the phase history of the STIP neighbours to a central pixel
+    specified by (x, y). """
+    # Central phase
+    cPhase = phase[:, int(y), int(x)]
     
-def plotNeighbours(x,y, hhist, vhist, phase):
+    # Create mask for transformations 
+    mask = ~np.isnan(hhist[:, y, x])
+    
+    # Create 2D array of transformations
+    coords = np.dstack((hhist[:, y, x][mask], vhist[:, y, x][mask]))[0]
+    
+    # Neighbour phase data
+    nPhase = np.zeros((len(phase), np.sum(mask*1)))
+    
+    # Initialise plot
+    fig, ax = plt.subplots()
+    
+    # Populate nPhase
+    for i in range(np.sum(mask*1)):
+        # Extract the transformation to neighbour pixel
+        h, v = coords[i]
+        
+        nPhase[:, i] = phase[:, int(y+v), int(x+h)]
+        
+        pltPhase = phase[:, int(y+v), int(x+h)]
+        
+        normPhase = pltPhase-cPhase
+        
+        for i in range(len(normPhase)):
+            if normPhase[i] > np.pi:
+                normPhase[i] = normPhase[i] - 2*np.pi
+            elif normPhase[i] < -np.pi:
+                normPhase[i] = normPhase[i] + 2*np.pi
+            else:
+                pass
+            
+        ax.plot(normPhase, '.')
+    ax.plot(cPhase-cPhase, 'rx')
+    plt.show()
+   
+def plotNeighbours2(x,y, hhist, vhist, phase):
     """Plot the neighbours"""
     data=[]
     mask = ~np.isnan(hhist[:, y, x])
     print (mask)
     coords = tuple(zip(hhist[:, y, x][mask], vhist[:, y, x][mask]))
     print (coords)
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(2)
     for h, v in coords:
         series = phase[:, int(y+v), int(x+h)]
         data.append(series)
     print (len(data))
     centralPhase = phase[:, int(y), int(x)]
-    centralAmp = amp[:, int(y), int(x)]
+#     centralAmp = amp[:, int(y), int(x)]
     for d in data:
-        ax.plot(d-centralPhase, 'b.')
-    ax.plot(centralPhase-centralPhase, 'r.')
-    plt.show()
-
-def plotNeighboursComp(x,y, hhist, vhist, phase, amp):
-    """Plot the neighbours"""
-
-    #Lists to add the phase and amp data to 
-    dataPhase=[]
-    dataAmp=[]
-    
-    # Create a mask to remove the pixels with no STIPs
-    mask = ~np.isnan(hhist[:, y, x])
-    
-    # Create a list of tuples with the coordinates of the neighbouring
-    # STIP pixels.
-    coords = tuple(zip(hhist[:, y, x][mask], vhist[:, y, x][mask]))
-
-    # Append the data for the neighbours to the lists
-    for h, v in coords:
-        phaseSeries = phase[:, int(y+v), int(x+h)]
-        ampSeries = amp[:, int(y+v), int(x+h)]
-        dataPhase.append(phaseSeries)
-        dataAmp.append(ampSeries)
-    
-    # Calculate the complex version of the central pixel
-    centralPhase = phase[:, int(y), int(x)]
-    centralAmp = amp[:, int(y), int(x)]
-    centralComp = toComplex(centralPhase, centralAmp)
-    
-    print (centralComp)
-    # Create the axes
-    fig, ax = plt.subplots()
-    
-    # Plot each of the 
-    for p, a in zip(dataPhase, dataAmp):
-        comp = toComplex(p, a) - centralComp
-        print (comp)
-        normalised = np.asarray([cmath.phase(c) for c in comp])
-        ax.plot(normalised, 'b.')
-    ax.plot(centralPhase-centralPhase, 'r.')
+        pltData = d-centralPhase
+        for i, p in enumerate(pltData):
+            if p>np.pi:
+                pltData[i] = p - 2*np.pi
+            elif p<-np.pi:
+                pltData[i] = p + 2*np.pi
+        ax[0].plot(pltData, 'b.', alpha=0.5)
+        ax[1].plot(d, 'b.', alpha=0.5)
+    ax[0].plot(centralPhase-centralPhase, 'rx')
+    ax[1].plot(centralPhase, 'rx')
     plt.show()
     
 def toComplex(p, a):
