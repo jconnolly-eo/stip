@@ -28,12 +28,14 @@ print ("\nModules loaded\n")
 
 #====================FILES=========================
 
-fn = r'/home/jacob/InSAR_workspace/data/doncaster/vel_jacob_doncaster.h5'
-fn2 = r'/home/jacob/InSAR_workspace/data/doncaster/data_jacob_doncaster.h5'
+#fn = r'/home/jacob/InSAR_workspace/data/doncaster/vel_jacob_doncaster.h5'
+#fn2 = r'/home/jacob/InSAR_workspace/data/doncaster/data_jacob_doncaster.h5'
 
 #fn = r'/nfs/a1/insar/sentinel1/UK/jacob_doncaster/vel_jacob_doncaster.h5'
 #fn2 = r'/nfs/a1/insar/sentinel1/UK/jacob_doncaster/data_jacob_doncaster.h5'
 
+fn = "C:/Users/jcobc/Documents/University/doncaster/vel_jacob_doncaster.h5"
+fn2 = "C:/Users/jcobc/Documents/University/doncaster/data_jacob_doncaster.h5"
 #==================PARAMETERS======================
 
 N = 18
@@ -344,10 +346,18 @@ def normalisedPhase(phase, amp, tl, br):
         aRegion = amp[i, c[1, 1]:c[1, 0], c[0, 0]:c[0, 1]]
 
         sumRegion = np.sum(toComplex(pRegion, aRegion))
+
+        normed = phase[i] - cmath.phase(sumRegion)
+
+        grtpiMask = normed > np.pi
+        lsrpiMask = normed < -np.pi
+
+        normed[grtpiMask] = normed[grtpiMask] - 2*np.pi
+        normed[lsrpiMask] = normed[lsrpiMask] + 2*np.pi
         
-        normed = np.exp(1j*phase[i])  *  np.exp(1j*cmath.phase(sumRegion)).conjugate()
+        #normed = np.exp(1j*phase[i])  *  np.exp(1j*cmath.phase(sumRegion)).conjugate()
         
-        pArrOut[i] = np.arctan(normed.imag/normed.real)
+        pArrOut[i] = normed#np.arctan(normed.imag/normed.real)
     
     return pArrOut 
 
@@ -542,6 +552,27 @@ def plotNeighbourRad(x, y, hhist, vhist, count):
     ax.set_aspect(1.0/ax.get_data_ratio()*0.8852)
     plt.show()
     
+def plotNeighbourRad(x, y, hhist, vhist, count):
+    
+    data = np.zeros((count.shape))
+    
+    mask = ~np.isnan(hhist[:, y, x])
+    print (mask)
+    coords = np.dstack((hhist[:, y, x][mask], vhist[:, y, x][mask]))[0]
+    
+    xpx = [x+c[0] for c in coords]
+    ypx = [y+c[1] for c in coords]
+    
+    fig, ax = plt.subplots()
+    r, c = count.shape
+    mx = np.asarray(([i for i in range(c)]*r)).reshape((r, c))
+    my = np.asarray(([[i]*c for i in np.arange(r)]))
+    p = ax.scatter(mx, my, c=count, s=0.5)
+    
+    ax.plot(x, y, 'rx')
+    ax.plot(xpx, ypx, 'b.')
+    ax.set_aspect(1.0/ax.get_data_ratio()*0.8852)
+    plt.show()
     
 def toComplex(p, a):
     return np.exp(1j*p)*a
