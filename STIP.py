@@ -27,16 +27,18 @@ print ("\nModules loaded\n")
 
 #====================FILES=========================
 
-fn = r'/home/jacob/InSAR_workspace/data/doncaster/vel_jacob_doncaster.h5'
-fn2 = r'/home/jacob/InSAR_workspace/data/doncaster/data_jacob_doncaster.h5'
+#fn = r'/home/jacob/InSAR_workspace/data/doncaster/vel_jacob_doncaster.h5'
+#fn2 = r'/home/jacob/InSAR_workspace/data/doncaster/data_jacob_doncaster.h5'
 
 #fn = r'/nfs/a1/insar/sentinel1/UK/jacob_doncaster/vel_jacob_doncaster.h5'
 #fn2 = r'/nfs/a1/insar/sentinel1/UK/jacob_doncaster/data_jacob_doncaster.h5'
 
+fn = "C:/Users/jcobc/Documents/University/doncaster/vel_jacob_doncaster.h5"
+fn2 = "C:/Users/jcobc/Documents/University/doncaster/data_jacob_doncaster.h5"
 #==================PARAMETERS======================
 
 N = 18
-w = 11
+w = 25
 
 #=====================CODE=========================
 
@@ -46,7 +48,7 @@ class Usage(Exception):
 
 def main(N, w):
     #phase_noise = extractData(fn2, 'Phase')
-    normPhase = normalisedPhase(phase[-20:], amp[-20:], (918, 63), (1020, 77))
+    normPhase = normalisedPhase(phase[-20:], amp[-20:], [800, 407], [936, 377])
     count, hhist, vhist = STIP(N, w, normPhase)
     
     hdfWrite(f"w{int(w)}d{int(N)}_norm.hdf5", count, hhist, vhist)
@@ -181,10 +183,10 @@ def circleMask(radius):
     # Create square matrix for with mask for circle
     #mask = np.ones((radius, radius))
     Y, X = np.ogrid[-radius:radius+1, -radius:radius+1]
-    dist_from_center = np.sqrt((X/3.966)**2 + (Y)**2)
+    dist_from_center = np.sqrt((X)**2 + (Y*3.966)**2)
     mask = dist_from_center <= radius
     
-    maskFlatten = [mask[d[0]+radius, d[1]+radius] for d in squareTransform]
+    maskFlatten = [mask[d[1]+radius, d[0]+radius] for d in squareTransform]
     
     return maskFlatten
     
@@ -335,17 +337,26 @@ def normalisedPhase(phase, amp, tl, br):
     dim = phase.shape
     
     pArrOut = phase.copy()
+    c = np.dstack((tl, br))[0]
     
     for i in range(dim[0]):
     
-        pRegion = phase[i, dim[1]-br[1]:dim[1]-tl[1], tl[0]:br[0]]
-        aRegion = amp[i, dim[1]-br[1]:dim[1]-tl[1], tl[0]:br[0]]
+        pRegion = phase[i, c[1, 1]:c[1, 0], c[0, 0]:c[0, 1]]
+        aRegion = amp[i, c[1, 1]:c[1, 0], c[0, 0]:c[0, 1]]
 
         sumRegion = np.sum(toComplex(pRegion, aRegion))
+
+        normed = phase[i] - cmath.phase(sumRegion)
+
+        grtpiMask = normed > np.pi
+        lsrpiMask = normed < -np.pi
+
+        normed[grtpiMask] = normed[grtpiMask] - 2*np.pi
+        normed[lsrpiMask] = normed[lsrpiMask] + 2*np.pi
         
-        normed = np.exp(1j*phase[i])  *  np.exp(1j*cmath.phase(sumRegion)).conjugate()
+        #normed = np.exp(1j*phase[i])  *  np.exp(1j*cmath.phase(sumRegion)).conjugate()
         
-        pArrOut[i] = np.arctan(normed.imag/normed.real)
+        pArrOut[i] = normed#np.arctan(normed.imag/normed.real)
     
     return pArrOut 
 
@@ -510,6 +521,29 @@ def plotNeighbours2(x,y, hhist, vhist, phase):
     ax[0].plot(centralPhase-centralPhase, 'rx')
     ax[1].plot(centralPhase, 'rx')
     plt.show()
+    
+def plotNeighbourRad(x, y, hhist, vhist, count):
+    
+    data = np.zeros((count.shape))
+    
+    mask = ~np.isnan(hhist[:, y, x])
+    print (mask)
+    coords = np.dstack((hhist[:, y, x][mask], vhist[:, y, x][mask]))[0]
+    
+    xpx = [x+c[0] for c in coords]
+    ypx = [y+c[1] for c in coords]
+    
+    fig, ax = plt.subplots()
+    r, c = count.shape
+    mx = np.asarray(([i for i in range(c)]*r)).reshape((r, c))
+    my = np.asarray(([[i]*c for i in np.arange(r)]))
+    p = ax.scatter(mx, my, c=count, s=0.5)
+    
+    ax.plot(x, y, 'rx')
+    ax.plot(xpx, ypx, 'b.')
+    ax.set_aspect(1.0/ax.get_data_ratio()*0.8852)
+    plt.show()
+    
     
 def toComplex(p, a):
     return np.exp(1j*p)*a
