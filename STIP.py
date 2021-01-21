@@ -34,8 +34,8 @@ print ("\nModules loaded\n")
 #fn = r'/nfs/a1/insar/sentinel1/UK/jacob_doncaster/vel_jacob_doncaster.h5'
 #fn2 = r'/nfs/a1/insar/sentinel1/UK/jacob_doncaster/data_jacob_doncaster.h5'
 
-fn = "C:/Users/jcobc/Documents/University/doncaster/vel_jacob_doncaster.h5"
-fn2 = "C:/Users/jcobc/Documents/University/doncaster/data_jacob_doncaster.h5"
+#fn = "C:/Users/jcobc/Documents/University/doncaster/vel_jacob_doncaster.h5"
+#fn2 = "C:/Users/jcobc/Documents/University/doncaster/data_jacob_doncaster.h5"
 #==================PARAMETERS======================
 
 N = 18
@@ -49,10 +49,10 @@ class Usage(Exception):
 
 def main(N, w):
     #phase_noise = extractData(fn2, 'Phase')
-    normPhase = normalisedPhase(phase[-20:], amp[-20:], [800, 407], [936, 377])
-    count, hhist, vhist = STIP(N, w, normPhase)
+    #normPhase = normalisedPhase(phase[-20:], amp[-20:], [800, 407], [936, 377])
+    count, hhist, vhist = STIP(N, w, phase)
     
-    hdfWrite(f"w{int(w)}d{int(N)}_norm.hdf5", count, hhist, vhist)
+    hdfWrite(f"w{int(w)}d{int(N)}.hdf5", count, hhist, vhist)
     #hdfWrite(f"coh.hdf5", count, hhist, vhist)
 
     
@@ -593,7 +593,7 @@ def indexCount(count, num):
 
 #main(N, w)
 phase = cropData(extractData(fn2, 'Phase'))
-amp = cropData(extractData(fn2, 'Amplitude'))
+#amp = cropData(extractData(fn2, 'Amplitude'))
 
 #count = cropData(extractData('w11-varied-dates/w11d18.hdf5', 'data_0'))
 #hhistory = cropData(extractData('w11-varied-dates/w11d18.hdf5', 'data_1'))
