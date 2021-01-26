@@ -1,16 +1,9 @@
 """
-Performs the STIP algorithm to an IFG stack to select scatterers for use in
-time-series analysis. 
+Performs the STIP algorithm to an IFG stack to select scatterers for use in time-series analysis. 
 """
 
 #=================MODULES=========================
 
-#import sys
-#import getopt
-#import os
-#import shutil
-#import subprocess as subp
-# import sqlite3
 from datetime import datetime as dt
 import numpy as np
 import re
@@ -23,13 +16,12 @@ import time
 import random
 import cmath
 
-
 print ("\nModules loaded\n")
 
 #====================FILES=========================
 
-#fn = r'/home/jacob/InSAR_workspace/data/doncaster/vel_jacob_doncaster.h5'
-#fn2 = r'/home/jacob/InSAR_workspace/data/doncaster/data_jacob_doncaster.h5'
+fn = r'/home/jacob/InSAR_workspace/data/doncaster/vel_jacob_doncaster.h5'
+fn2 = r'/home/jacob/InSAR_workspace/data/doncaster/data_jacob_doncaster.h5'
 
 #fn = r'/nfs/a1/insar/sentinel1/UK/jacob_doncaster/vel_jacob_doncaster.h5'
 #fn2 = r'/nfs/a1/insar/sentinel1/UK/jacob_doncaster/data_jacob_doncaster.h5'
@@ -49,34 +41,30 @@ class Usage(Exception):
 
 def main(N, w):
     #phase_noise = extractData(fn2, 'Phase')
-    #normPhase = normalisedPhase(phase[-20:], amp[-20:], [800, 407], [936, 377])
-    count, hhist, vhist = STIP(N, w, phase)
+    normPhase = normalisedPhase(phase[-20:], amp[-20:], [800, 407], [936, 377])
+    count, hhist, vhist = STIP(N, w, normPhase)
     
-    hdfWrite(f"w{int(w)}d{int(N)}.hdf5", count, hhist, vhist)
+    hdfWrite(f"w{int(w)}d{int(N)}_norm.hdf5", count, hhist, vhist)
     #hdfWrite(f"coh.hdf5", count, hhist, vhist)
 
     
 #==================READING DATA====================
-        
-#def open_hdf(fn):
-#    """Open the file and assign vars to datasets. """ 
-#    global f
-#    f = h5.File(fn, 'r')
-#    headers = list(f.keys())    
-#    return f
 
-def extractData(file, header):
+def hdfRead(file, header=False):
     """Short function to extract data from the file. Returns False if no data is found
     for that header. """
     with h5.File(file) as f:
-        try:
-            data = np.asarray(f[header])
-            
-        except KeyError:
-            print (f'No dataset for {header} found. Set to False. \n')
-            headers = list(f.keys())
-            print ('Possible headers: \n', headers)
-            data = False
+        if header:
+            try:
+                data = np.asarray(f[header])
+
+            except KeyError:
+                print (f'No dataset for {header} found. Set to False. \n')
+                headers = list(f.keys())
+                print ('Possible headers: \n', headers)
+                data = False
+        else:
+            data = [np.asarray(f[str(h)]) for h in list(f.keys())]
     return data
     
 def csvRead(fname):
@@ -175,10 +163,9 @@ def STIP(N, window, ifgs):
     return STIP_count, hhistory, vhistory
     
 def circleMask(radius):
-    
-#    if diameter%2:
-#       print ("You should use an odd diameter.")
-    
+    """
+    Creates a mask of the transformations so that the window is geometrically correct. 
+    """
     squareTransform = neighbourhood(radius*2 + 1)
     
     # Create square matrix for with mask for circle
@@ -386,38 +373,6 @@ def radCoor(arr, colour=True, mask=True, region=[0, 0, 0, 0]):
     #fig.set_figwidth(6*1.1297)
     ax.set_aspect(1.0/ax.get_data_ratio()*0.8852)#1.1297)
     plt.show()
-    
-
-def time_series(data, dateix, dates, mask):
-    fig, ax = plt.subplots()
-    print ('Created subplot \n')
-
-    datebool = type(dateix) is tuple
-    if datebool:
-        a, b = dateix
-        data = data[a:b]
-        dates = dates[a:b]
-    else:
-        data = data[-dateix:]
-        dates = dates[-dateix:]
-
-    
-    datesf = np.asarray([dt.strptime(str(d[0]), '%Y%m%d') for d in dates]) 
-    print ('Formatted dates \n')
-    x, y = mask.shape
-    mask = mask.flatten()
-    print (f'Data shape: {data.shape}')
-    datat = data.T.reshape((x*y, len(data)))[mask]
-    print ('Reshaped data \n')
-    # Plotting
-    print (f'Plotting {len(datat)}')
-    for series in datat:
-
-        ax.plot(datesf, series, '.')
-
-    plt.show()
-            
-    return
 
 def hist(array):
     try:
@@ -430,13 +385,6 @@ def hist(array):
     bins = np.arange(0, 110, 5) - 2.5
     ax.hist(arrayf, bins, rwidth=0.95)
     plt.show()
-
-def contour(arr):
-    fig, ax = plt.subplots()
-    contf = ax.contourf(arr)
-    cbar = fig.colorbar(contf)
-    plt.savefig('STIP_cont.png')
-    plt.show()
     
 def scatter(lon, lat, col):
     fig, ax = plt.subplots()
@@ -445,59 +393,9 @@ def scatter(lon, lat, col):
     #plt.savefig('STIP_scatter.png')
     ax.set_aspect(1.0/ax.get_data_ratio()*0.8852)
     plt.show()
-
-def cumulative(count):
-    c = []
-    for i in range(np.max(count)):
-        mask = (count > i)
-        c.append(np.sum(mask*1))
-        
-    plt.plot(c)
-    plt.show()
-    
-def plotNeighbours(x, y, hhist, vhist, phase):
-    """Plot the phase history of the STIP neighbours to a central pixel
-    specified by (x, y). """
-    # Central phase
-    cPhase = phase[:, int(y), int(x)]
-    
-    # Create mask for transformations 
-    mask = ~np.isnan(hhist[:, y, x])
-    
-    # Create 2D array of transformations
-    coords = np.dstack((hhist[:, y, x][mask], vhist[:, y, x][mask]))[0]
-    
-    # Neighbour phase data
-    nPhase = np.zeros((len(phase), np.sum(mask*1)))
-    
-    # Initialise plot
-    fig, ax = plt.subplots()
-    
-    # Populate nPhase
-    for i in range(np.sum(mask*1)):
-        # Extract the transformation to neighbour pixel
-        h, v = coords[i]
-        
-        nPhase[:, i] = phase[:, int(y+v), int(x+h)]
-        
-        pltPhase = phase[:, int(y+v), int(x+h)]
-        
-        normPhase = pltPhase-cPhase
-        
-        for i in range(len(normPhase)):
-            if normPhase[i] > np.pi:
-                normPhase[i] = normPhase[i] - 2*np.pi
-            elif normPhase[i] < -np.pi:
-                normPhase[i] = normPhase[i] + 2*np.pi
-            else:
-                pass
-            
-        ax.plot(normPhase, '.')
-    ax.plot(cPhase-cPhase, 'rx')
-    plt.show()
    
-def plotNeighbours2(x,y, hhist, vhist, phase):
-    """Plot the neighbours"""
+def plotNeighbours(x,y, hhist, vhist, phase):
+    """Not used..."""
     data=[]
     mask = ~np.isnan(hhist[:, y, x])
     print (mask)
@@ -531,28 +429,7 @@ def plotNeighbours2(x,y, hhist, vhist, phase):
     plt.show()
     
 def plotNeighbourRad(x, y, hhist, vhist, count):
-    
-    data = np.zeros((count.shape))
-    
-    mask = ~np.isnan(hhist[:, y, x])
-    print (mask)
-    coords = np.dstack((hhist[:, y, x][mask], vhist[:, y, x][mask]))[0]
-    
-    xpx = [x+c[0] for c in coords]
-    ypx = [y+c[1] for c in coords]
-    
-    fig, ax = plt.subplots()
-    r, c = count.shape
-    mx = np.asarray(([i for i in range(c)]*r)).reshape((r, c))
-    my = np.asarray(([[i]*c for i in np.arange(r)]))
-    p = ax.scatter(mx, my, c=count, s=0.5)
-    
-    ax.plot(x, y, 'rx')
-    ax.plot(xpx, ypx, 'b.')
-    ax.set_aspect(1.0/ax.get_data_ratio()*0.8852)
-    plt.show()
-    
-def plotNeighbourRad(x, y, hhist, vhist, count):
+    """Plot position of neighbours in radar coords"""
     
     data = np.zeros((count.shape))
     
@@ -577,23 +454,9 @@ def plotNeighbourRad(x, y, hhist, vhist, count):
 def toComplex(p, a):
     return np.exp(1j*p)*a
     
-def av_comp(arr):
-    """    """
-    i = 0+1j
-    comp = np.exp(i*arr)
-    
-    avphase = cmath.phase(np.mean(comp))
-    
-    return avphase 
-    
-def indexCount(count, num):
-    l = zip(*np.where(count==num))
-    
-    
-
 #main(N, w)
-phase = cropData(extractData(fn2, 'Phase'))
-#amp = cropData(extractData(fn2, 'Amplitude'))
+#phase = cropData(hdfRead(fn2, 'Phase'))
+#amp = cropData(hdfRead(fn2, 'Amplitude'))
 
 #count = cropData(extractData('w11-varied-dates/w11d18.hdf5', 'data_0'))
 #hhistory = cropData(extractData('w11-varied-dates/w11d18.hdf5', 'data_1'))
