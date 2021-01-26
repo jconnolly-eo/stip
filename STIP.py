@@ -20,17 +20,17 @@ print ("\nModules loaded\n")
 
 #====================FILES=========================
 
-fn = r'/home/jacob/InSAR_workspace/data/doncaster/vel_jacob_doncaster.h5'
-fn2 = r'/home/jacob/InSAR_workspace/data/doncaster/data_jacob_doncaster.h5'
+#fn = r'/home/jacob/InSAR_workspace/data/doncaster/vel_jacob_doncaster.h5'
+#fn2 = r'/home/jacob/InSAR_workspace/data/doncaster/data_jacob_doncaster.h5'
 
-#fn = r'/nfs/a1/insar/sentinel1/UK/jacob_doncaster/vel_jacob_doncaster.h5'
-#fn2 = r'/nfs/a1/insar/sentinel1/UK/jacob_doncaster/data_jacob_doncaster.h5'
+fn = r'/nfs/a1/insar/sentinel1/UK/jacob_doncaster/vel_jacob_doncaster.h5'
+fn2 = r'/nfs/a1/insar/sentinel1/UK/jacob_doncaster/data_jacob_doncaster.h5'
 
 #fn = "C:/Users/jcobc/Documents/University/doncaster/vel_jacob_doncaster.h5"
 #fn2 = "C:/Users/jcobc/Documents/University/doncaster/data_jacob_doncaster.h5"
 #==================PARAMETERS======================
 
-N = 18
+N = 40
 w = 25
 
 #=====================CODE=========================
@@ -41,8 +41,8 @@ class Usage(Exception):
 
 def main(N, w):
     #phase_noise = extractData(fn2, 'Phase')
-    normPhase = normalisedPhase(phase[-20:], amp[-20:], [800, 407], [936, 377])
-    count, hhist, vhist = STIP(N, w, normPhase)
+    #normPhase = normalisedPhase(phase[-20:], amp[-20:], [800, 407], [936, 377])
+    count, hhist, vhist = STIP(N, w, phase[81:81+N])
     
     hdfWrite(f"w{int(w)}d{int(N)}_norm.hdf5", count, hhist, vhist)
     #hdfWrite(f"coh.hdf5", count, hhist, vhist)
