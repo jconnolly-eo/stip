@@ -121,16 +121,19 @@ def STIP(N, window, ifgs):
             esum = np.zeros((r, c))*1j
             for m in np.arange(len(ifgs)):
             # Looping through the dates 
-                
+                padMask = np.zeroes((r, c))
                 if 1 <= m+n <= N-2:
                     #print (f'm={m}')
                     # Center pixel
                     pc = ifgs[m]
                     # Neighbour pixel (same matrix but shifted some way based on h & v.
-                    pn = padding(ifgs[m+n], h, v)
-                    padmask = (pn==0)
+                    #pn = padding(ifgs[m+n], h, v)
+                    border = (window-1)/2
+                    pn = np.pad(ifgs[m+n], border, 'reflect')[border+h:-border+h, border+v:-border+v]
+                    padMask = np.pad(padMask, bored, 'constant', constant_values=1)[border+h:-border+h, border+v:-border+v].astype('bool')
+                    #padmask = (pn==0)
                     e = coherence(pc, pn)
-                    e[padmask] = 0
+                    e[padMask] = 0
                     # Exponential sum
                     esum += e
                 else:
