@@ -15,6 +15,8 @@ from matplotlib.lines import Line2D
 import time
 import random
 import cmath
+import numexpr as ne
+import math
 
 print ("\nModules loaded\n")
 
@@ -30,7 +32,7 @@ fn2 = r'/nfs/a1/insar/sentinel1/UK/jacob_doncaster/data_jacob_doncaster.h5'
 #fn2 = "C:/Users/jcobc/Documents/University/doncaster/data_jacob_doncaster.h5"
 #==================PARAMETERS======================
 
-N = 40
+N = 18
 w = 25
 
 #=====================CODE=========================
@@ -44,7 +46,7 @@ def main(N, w):
     #normPhase = normalisedPhase(phase[-20:], amp[-20:], [800, 407], [936, 377])
     count, hhist, vhist = STIP(N, w, phase[81:81+N])
     
-    hdfWrite(f"w{int(w)}d{int(N)}_norm.hdf5", count, hhist, vhist)
+    hdfWrite(f"w{int(w)}d{int(N)}_reflect.hdf5", count, hhist, vhist)
     #hdfWrite(f"coh.hdf5", count, hhist, vhist)
 
     
@@ -96,7 +98,7 @@ def STIP(N, window, ifgs):
     N-1 = no. of IFGs"""
     t1 = time.time()
 #    dates = np.asarray(extractData('Date', f))
-    ifgs = ifgs[-(N-1):]
+    #ifgs = ifgs[-(N-1):]
     datesn, r, c = ifgs.shape # For dates, rows, columns
 
     STIP_count = np.zeros((r, c))
@@ -110,6 +112,7 @@ def STIP(N, window, ifgs):
     vhistory = np.empty((len(maskeddlist), r, c))
     print (maskeddlist)
     for h, v in maskeddlist:
+        t = time.time()
         print (f'h={h}, v={v}')
         # Looping through the padding to create the neighbour matrices
         lag = np.arange(-(N-2), N-1, 1) 
@@ -121,18 +124,19 @@ def STIP(N, window, ifgs):
             esum = np.zeros((r, c))*1j
             for m in np.arange(len(ifgs)):
             # Looping through the dates 
-                padMask = np.zeroes((r, c))
+                padMask = np.zeros((r, c))
                 if 1 <= m+n <= N-2:
                     #print (f'm={m}')
                     # Center pixel
                     pc = ifgs[m]
                     # Neighbour pixel (same matrix but shifted some way based on h & v.
                     #pn = padding(ifgs[m+n], h, v)
-                    border = (window-1)/2
-                    pn = np.pad(ifgs[m+n], border, 'reflect')[border+h:-border+h, border+v:-border+v]
-                    padMask = np.pad(padMask, bored, 'constant', constant_values=1)[border+h:-border+h, border+v:-border+v].astype('bool')
+                    border = int((window-1)/2)
+                    pn = np.pad(ifgs[m+n], border+1, 'reflect')[border+v+1:-border+v-1, border+h+1:-border+h-1]
+                    padMask = np.pad(padMask, border+1, 'constant', constant_values=1)[border+v+1:-border+v-1, border+h+1:-border+h-1].astype('bool')
                     #padmask = (pn==0)
-                    e = coherence(pc, pn)
+                    #print (f'Central shape: {pc.shape} \nNeighbour shape: {pn.shape}')
+                    e = neCoherence(pc, pn)
                     e[padMask] = 0
                     # Exponential sum
                     esum += e
@@ -159,7 +163,7 @@ def STIP(N, window, ifgs):
         vhistory[historyix] = vmask
         
         STIP_count += STIP_mask*1
-
+        print (time.time() - t)
         # The loop is restarted for the next h and v values.
     t2 = time.time()
     print (t2-t1)
@@ -206,6 +210,10 @@ def maskTransform(dlist, mask, h, v):
 
 def coherence(arr1, arr2):
     return np.exp(1j*arr1)*np.exp(-1j*arr2)
+
+def neCoherence(arr1, arr2):
+    e = math.e
+    return ne.evaluate("e**(1j*arr1) * e**(-1j*arr2)")
 
 def padding(arr, h, v):
     """If h -ve then add columns to the left. +ve add columns to the right
